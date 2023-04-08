@@ -58,7 +58,6 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
                 raise "Padding is not valid" #TODO verify what to do in this case
         expected_pad_len = self.block_len - ((len(actual_data) + 1) % self.block_len) #TODO maybe extract, also used in __pad
         if expected_pad_len != pad_len:
-            print(f"{expected_pad_len=} {pad_len=}")
             raise "Padding is not valid" #TODO verify what to do in this case
         return actual_data
 
@@ -70,7 +69,6 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         :return: padded data with length an integral multiple of block_len
         """
         pad_len = self.block_len - ((len(data) + 1) % self.block_len)
-        print(f"{pad_len=}, {data=}")
         padding = pad_len.to_bytes(1, 'little') * (pad_len + 1)
         return data + padding
 
@@ -117,7 +115,6 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         :return: c, the result of authenticated encryption
         """
         tag = self.__auth_with_truncate(aad + data)
-        print(f"{len(tag)=}")
         padded_data = self.__pad(data + tag)
         return self.__encrypt(padded_data, nonce)
 
@@ -135,8 +132,6 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         data, tag = plain_no_pad[:-self.mac_len], plain_no_pad[-self.mac_len:]
         expected_tag = self.__auth_with_truncate(aad + data)
         if tag != expected_tag:
-            print(f"{data=} {tag=} {expected_tag=}")
-            print(f"{len(tag)=} {len(expected_tag)=}")
             raise "Invalid tag" #TODO check what is the FAIL state in the doc
         return data
 
