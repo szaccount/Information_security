@@ -69,7 +69,9 @@ class RSA(object):
             print('init vars:', k, N)
         if (p is not None) and (q is not None):
             self.phin = (p - 1) * (q - 1)
-            self.d = ?
+            # de = 1 (mod (p-1)(q-1)) and thus is divisible by
+            # both p-1, q-1.
+            self.d = modinv(self.e, self.phin)
             self.test()
         else:
             self.d = None
@@ -121,8 +123,10 @@ class RSA_PKCS_1(RSA):
             raise Exception("first byte must be nonzero 0 if bt=0")
 
         if ps is None:
-            ps = ?
-        eb = ?  # Encryption Block
+            # PS is at least `RSA_PKCS_1.min_pad_size-3` long, as
+            # it was validated that d is short enough.
+            ps = self.pad(self.k - 3 - len(d))
+        eb = b'\x00' + self.bt.to_bytes(1, byteorder='big') + ps + b'\x00' + d
 
         x = int.from_bytes(eb, byteorder='big')  # Conversion to integer
 
@@ -176,7 +180,39 @@ class RSA_PKCS_1(RSA):
         :param eb: encryption block
         :return: parsed data
         """
-        ?
+        # Validate that the block is of valid size.
+        if len(eb) != self.k:
+            return None
+        # Validate that the first byte is 00.
+        first_byte = eb[0]
+        if first_byte != 0:
+            return None
+        # Validate matching BT.
+        # The BT should be only 2 for private-key decryption,
+        # 0 and 1 are supported for completness (for public-key decryption).
+        bt = eb[1]
+        if bt != self.bt:
+            return None
+        # Strip PS.
+        if self.bt == 0:
+            d = eb[2:].lstrip(b'\x00')
+        elif self.bt == 1:
+            zero_and_d = eb[2:].lstrip(b'\xFF')
+            # The byte following the PS should be 00.
+            if zero_and_d[0] != 0:
+                return None
+            d = zero_and_d[1:]
+        elif self.bt == 2:
+            # The byte following the PS should be 00,
+            # the PS does not contain zero bytes.
+            ps, zero_byte, d = eb[2:].partition(b'\x00')
+            if zero_byte != b'\x00':
+                return None
+        # Validate the PS is at least `RSA_PKCS_1.min_pad_size-3` bytes long.
+        padding_length = len(eb) - len(d)
+        if padding_length < RSA_PKCS_1.min_pad_size:
+            return None
+        return d
 
 
 if __name__ == "__main__":
