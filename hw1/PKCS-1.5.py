@@ -229,10 +229,26 @@ def test_PKCS():
         pkcs = RSA_PKCS_1(bt, *keys)
 
         ed = pkcs.enc_PKCS_1(data)
-        print(f"{ed=}")
 
         d = pkcs.dec_PKCS_1(ed)
-        print(f"{d=}")
+        assert d == data
+
+        ps_length = pkcs.k - 3 - len(data)
+        ed = pkcs.enc_PKCS_1(
+            data,
+            ps=b"\xFF" + b"\x00" * (ps_length - 1)
+        )
+        # PS creates too short padding.
+        d = pkcs.dec_PKCS_1(ed)
+        assert pkcs.dec_PKCS_1(ed) is None, f"{bt=}, {d=}"
+        if bt == 1:
+            ed = pkcs.enc_PKCS_1(
+                data,
+                ps=b"\xFF" * (ps_length - 1) + b"\x11"
+            )
+            # PS isn't all FF.
+            d = pkcs.dec_PKCS_1(ed)
+            assert pkcs.dec_PKCS_1(ed) is None, f"{bt=}, {d=}"
 
     plaintext = b'secret message'
     k = 512
@@ -248,6 +264,7 @@ def test_PKCS():
     assert ed == ciphertext
     d = pkcs.dec_PKCS_1(ed)
     assert d == plaintext
+    print("Success")
 
 
 if __name__ == "__main__":
