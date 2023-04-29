@@ -126,9 +126,9 @@ class RSA_PKCS_1(RSA):
             # PS is at least `RSA_PKCS_1.min_pad_size-3` long, as
             # it was validated that d is short enough.
             ps = self.pad(self.k - 3 - len(d))
-        # We do not validated that a ps passed from the user is valid,
+        # We do not validate that a PS passed from the user is valid,
         # because we understood from the requirements that we should only
-        # validate in the decryption. Also, allowing any ps seems
+        # validate this in the decryption. Also, allowing any PS seems
         # useful for testing the code (mainly testing the parsing).
         eb = b'\x00' + self.bt.to_bytes(1, byteorder='big') + ps + b'\x00' + d
 
