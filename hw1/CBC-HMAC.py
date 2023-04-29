@@ -51,14 +51,17 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         :param data: input data
         :return: stripped data
         """
+        if len(data) % self.block_len != 0:
+            return None # invalid message length 
         pad_len = data[-1]
+        if pad_len > 255 or pad_len < 0:
+            return None # invalid padding length
+        if pad_len > len(data) - 1:
+            return None # invalid padding length
         actual_data, padding = data[:-(pad_len + 1)], data[-(pad_len + 1): -1]
         for byte in padding:
             if byte != pad_len:
                 return None # invalid padding
-        expected_pad_len = self.block_len - ((len(actual_data) + 1) % self.block_len)
-        if expected_pad_len != pad_len:
-            return None # invalid padding
         return actual_data
 
     def __pad(self, data):
@@ -68,7 +71,7 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         :return: padded data with length an integral multiple of block_len
         """
         pad_len = self.block_len - ((len(data) + 1) % self.block_len)
-        padding = pad_len.to_bytes(1, 'little') * (pad_len + 1)
+        padding = pad_len.to_bytes(1, byteorder='big') * (pad_len + 1)
         return data + padding
 
     def __auth(self, data):
