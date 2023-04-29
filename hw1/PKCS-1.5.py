@@ -193,7 +193,8 @@ class RSA_PKCS_1(RSA):
             return None
         # Validate matching BT.
         # The BT should be only 2 for private-key decryption,
-        # 0 and 1 are supported for completness (for public-key decryption).
+        # 0 and 1 are supported for completness
+        # (for public-key decryption, for signatures).
         bt = eb[1]
         if bt != self.bt:
             return None
