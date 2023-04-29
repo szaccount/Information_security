@@ -53,14 +53,13 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         """
         pad_len = data[-1]
         actual_data, padding = data[:-(pad_len + 1)], data[-(pad_len + 1): -1]
-        for byte in padding: # TODO verify we check all
+        for byte in padding:
             if byte != pad_len:
-                raise "Padding is not valid" #TODO verify what to do in this case
-        expected_pad_len = self.block_len - ((len(actual_data) + 1) % self.block_len) #TODO maybe extract, also used in __pad
+                return None # invalid padding
+        expected_pad_len = self.block_len - ((len(actual_data) + 1) % self.block_len)
         if expected_pad_len != pad_len:
-            raise "Padding is not valid" #TODO verify what to do in this case
+            return None # invalid padding
         return actual_data
-
 
     def __pad(self, data):
         """
@@ -71,8 +70,6 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         pad_len = self.block_len - ((len(data) + 1) % self.block_len)
         padding = pad_len.to_bytes(1, 'little') * (pad_len + 1)
         return data + padding
-
-
 
     def __auth(self, data):
         """
@@ -98,7 +95,6 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
         decryptor = cipher.decryptor()
         return decryptor.update(c) + decryptor.finalize()
 
-    # TODO, verify need to truncate, we added this function
     def __auth_with_truncate(self, data):
         """
         Returning truncated auth byte string.
@@ -129,10 +125,12 @@ class AEAD_AES_128_CBC_HMAC_SHA_256(AEAD):
 
         plain = self.__decrypt(c, nonce)
         plain_no_pad = self.__strip_padding(plain)
+        if plain_no_pad == None:
+            return None # validation of padding failed
         data, tag = plain_no_pad[:-self.mac_len], plain_no_pad[-self.mac_len:]
         expected_tag = self.__auth_with_truncate(aad + data)
         if tag != expected_tag:
-            raise "Invalid tag" #TODO check what is the FAIL state in the doc
+            return None # validation of MAC failed
         return data
 
 
@@ -148,7 +146,7 @@ def test_CBC():
     assert ciphertext == expected_ciphertext
     p = aead.authenticated_dec(ciphertext, aad, nonce)
     assert p == data
-
+    print("Success")
 
 
 if __name__ == "__main__":
@@ -170,6 +168,3 @@ if __name__ == "__main__":
     print(p)
     print(len(data))
     print(len(ciphertext))
-
-    print("Running another test")
-    test_CBC()
