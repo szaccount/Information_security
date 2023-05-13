@@ -10,6 +10,9 @@ import numpy as np
 from hashlib import sha256
 import copy
 
+# our imports
+import itertools
+
 BlockSize = 16
 NumTables = 4
 
@@ -295,7 +298,30 @@ def recover_full_key(key_len, k0_list, k1_list):
     """
     full_key_list = []
 
-    pass #?
+    print(f"{key_len=} {len(k0_list)=} {len(k1_list)=} {k0_list=} {k1_list=}")
+    if key_len != 128 and key_len != 256:
+        print("THIS IS VERY VERY BAD HANDLE IT") # TODO handle it !!!!!!!!
+    
+    if key_len == 128:
+        for k0 in k0_list:
+            aes = AESr(bytes.fromhex(k0), 2) # need only number of rounds that gives k1
+            k1 = bytes(aes.get_round_key_bytes(1))
+            if k1 in k1_list:
+                full_key_list.append(k0)
+
+    if key_len == 192:
+        for k0 in k0_list:
+            for k1 in k1_list:
+                key = k0 + k1[:8]
+                aes = AESr(bytes.fromhex(key), 2) # need only number of rounds that gives k1
+                if k1 == bytes(aes.get_round_key_bytes(1)):
+                    full_key_list.append(key)
+    
+    if key_len == 256:
+        for k0 in k0_list:
+            for k1 in k1_list:
+                key = k0 + k1
+                full_key_list.append(key)
 
     # Remove duplicate keys
     return list(dict.fromkeys(full_key_list))
@@ -392,7 +418,7 @@ def check_test_vectors():
     k0_high_list = generate_key_options([[]], key_list)
     k0_list = []
     for k0 in k0_high_list:
-        key_list = guess_key_ttable(plaintexts, unaccessed_list, k0, True)
+        key_list = guess_key_ttable(plaintexts, unaccessed_list, k0, False) # was True chagne !!!!!!
         k0_list += copy.copy(key_list)
 
     # Remove duplicate keys
@@ -424,6 +450,7 @@ if __name__ == "__main__":
 
     check_test_vectors()
 
-    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
+    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, False) # was True remove this line !!!!
+    # keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
     for k in keys:
         print(k.hex())
