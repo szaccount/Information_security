@@ -9,6 +9,7 @@ from softAESr import AESr
 import numpy as np
 from hashlib import sha256
 import copy
+import struct
 
 # our imports
 import itertools
@@ -180,11 +181,20 @@ def find_unviable_candidates(j, T_result, k0_low, viable):
     k0_0 = k0_low >> 12 & 0xf
     k0_1 = k0_low >> 8 & 0xf
     k0_2 = k0_low >> 4 & 0xf
-    k0_3 = k0_low & 0xf       
+    k0_3 = k0_low & 0xf
+
+    k0_list = [k0_0, k0_1, k0_2, k0_3] # !!!!!!! perhaps opposite order
 
     unviable = []
 
-    pass #?
+    for i in range(NumTables): # verify what is i NumTables
+        for k1_nibble in range(2**4):
+            k1_nibble_full = k1_nibble << 4
+            column = (T_result[j][k0_list[0]][0] ^ T_result[j][k0_list[1]][1] ^ T_result[j][k0_list[2]][2] ^ T_result[j][k0_list[3]][3])
+            column_cell_i = (column >> ((NumTables - i - 1) * 8)) & 0xFF
+            access = (column_cell_i ^ k1_nibble_full) >> 4
+            if not viable[access][i]:
+                unviable.append((k1_nibble, i))
 
     return unviable
 
@@ -273,7 +283,8 @@ def guess_k1_ttable(plaintexts, unaccessed_list, k0, verbose=False):
 
     r1 = np.empty(num_traces, dtype=bytearray)
 
-    pass #?
+    for j in range(num_traces):
+        r1[j] = aes.encrypt_r(plaintexts[j], end_round=1)
 
     key_list = guess_key_high(r1, unaccessed_list)
 
@@ -346,7 +357,7 @@ def cache_attack(key_len, plaintexts, accessed_list, verbose=False):
 
     k0_high_list = generate_key_options([[]], key_list)
     k0_list = []
-    for k0 in k0_high_list:
+    for k0 in k0_high_list: # !!!!!!!!!!!!!!!!!!!!!!!!!!
         key_list = guess_key_ttable(plaintexts, unaccessed_list, k0, verbose)
         if verbose:
             print("Number of k0 options: ", len(key_list))
@@ -408,6 +419,8 @@ def check_test_vectors():
         for nibble in unaccessed_list[0][i]:
             viable[nibble >> 4][i] = False
 
+    print("HERE")
+    print(find_unviable_candidates(0, T_result, 0, viable))
     if set(find_unviable_candidates(0, T_result, 0, viable)) == {(2, 0), (5, 0), (7, 0), (8, 0), (11, 0), (13, 0), (4, 1), (5, 1), (6, 1), (8, 1), (9, 1), (10, 1), (13, 1), (6, 2), (7, 2), (8, 2), (9, 2), (14, 2), (0, 3), (1, 3), (3, 3), (5, 3), (6, 3), (11, 3), (13, 3)}:
         print("find_unviable_candidates: Functional")
     else:
