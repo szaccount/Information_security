@@ -318,7 +318,7 @@ def recover_full_key(key_len, k0_list, k1_list):
     
     if key_len == 128:
         for k0 in k0_list:
-            aes = AESr(bytes.fromhex(k0), 2) # need only number of rounds that gives k1
+            aes = AESr(k0, 2) # need only number of rounds that gives k1
             k1 = bytes(aes.get_round_key_bytes(1))
             if k1 in k1_list:
                 full_key_list.append(k0)
@@ -327,7 +327,7 @@ def recover_full_key(key_len, k0_list, k1_list):
         for k0 in k0_list:
             for k1 in k1_list:
                 key = k0 + k1[:8]
-                aes = AESr(bytes.fromhex(key), 2) # need only number of rounds that gives k1
+                aes = AESr(key, 2) # need only number of rounds that gives k1
                 if k1 == bytes(aes.get_round_key_bytes(1)):
                     full_key_list.append(key)
     
