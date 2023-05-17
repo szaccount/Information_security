@@ -284,7 +284,10 @@ def guess_k1_ttable(plaintexts, unaccessed_list, k0, verbose=False):
     r1 = np.empty(num_traces, dtype=bytearray)
 
     for j in range(num_traces):
-        r1[j] = aes.encrypt_r(plaintexts[j], end_round=1)
+        # Our comment: instead of using the modified version can call the regular and xor it with get_round_key_bytes(1) of k0
+        r1[j] = bytes(aes.encrypt_r_modified(plaintexts[j], end_round=2))
+        # r1[j] = bytes(aes.encrypt_r_modified(plaintexts[j], end_round=2, xorlastroundkey=False))
+        print(f"############### {r1[j]=}")
 
     key_list = guess_key_high(r1, unaccessed_list)
 
@@ -443,6 +446,40 @@ def check_test_vectors():
         print("guess_key_ttable: Not Functional")
 
 
+def check_test_vectors_192(): # Our funcion
+    print("Our 192 bit key test")
+    num_traces = 15
+    plaintext_seed = 0
+
+    key = '00112233445566778899aabbccddeeff1011121314151617'
+
+    plaintexts = np.empty(num_traces, dtype=bytearray)
+    for i in range(num_traces):
+        sha = sha256()
+        sha.update(bytes([plaintext_seed]) + bytes([i]))
+        plaintexts[i] = sha.digest()[:BlockSize]
+        print(f"Debugging {plaintexts[i]=}") # DELETE this
+
+    keyarr = bytes.fromhex(key)
+
+    accessed_list = simulate_cache_access(plaintexts, keyarr, 0, 3)
+
+    ###############
+    # k0 = b'\x00\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff'
+    # unaccessed_list = find_unaccessed(accessed_list)
+    # key_list = guess_k1_ttable(plaintexts, unaccessed_list, k0, True)
+    # print(f"Printing k1 list debug {key_list}")
+    # pass
+    ###############
+
+    # check_test_vectors()
+
+    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True) # was True remove this line !!!!
+    # keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
+    for k in keys:
+        print(k.hex())
+
+
 if __name__ == "__main__":
 
     num_traces = 15
@@ -456,10 +493,19 @@ if __name__ == "__main__":
         sha = sha256()
         sha.update(bytes([plaintext_seed]) + bytes([i]))
         plaintexts[i] = sha.digest()[:BlockSize]
+        print(f"Debugging {plaintexts[i]=}") # DELETE this
 
     keyarr = bytes.fromhex(key)
 
     accessed_list = simulate_cache_access(plaintexts, keyarr, 0, 3)
+
+    ###############
+    k0 = b'\x00\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff'
+    unaccessed_list = find_unaccessed(accessed_list)
+    key_list = guess_k1_ttable(plaintexts, unaccessed_list, k0, True)
+    print(f"Printing k1 list debug {key_list}")
+    pass
+    ###############
 
     check_test_vectors()
 
