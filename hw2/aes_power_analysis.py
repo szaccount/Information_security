@@ -12,6 +12,9 @@ import copy
 
 BlockSize = 16
 
+def xor_bytes(ba1, ba2):
+    return bytes([b1 ^ b2 for b1, b2 in zip(ba1, ba2)])
+
 
 def hamming_weight(x):
     """
@@ -64,7 +67,7 @@ def simulate_power_analysis(plaintexts, key, start_round, end_round):
         for r in range(max(start_round, 1), end_round + 1):
             stateround = aes.encrypt_r(plaintexts[j], r, start_round)
             for i in range(BlockSize):
-                ?
+                hamming_distances[j][r - 1][i] = hamming_weight(aes.S[stateround[i]] ^ stateround[i])
 
     return hamming_distances
 
@@ -84,7 +87,12 @@ def guess_key_hd(plaintexts, hamming_distances, r):
     for i in range(BlockSize):
         guess_list = np.full(2 ** 8, True)
 
-        ?
+        for j in range(len(plaintexts)):
+            for l in range(2 ** 8):
+                stateround_i = plaintexts[j][i] ^ l
+                if hamming_weight(AESr.S[stateround_i] ^ stateround_i) != hamming_distances[j][r][i]:
+                    guess_list[l] = False
+
 
         key_list[i] = [guess for guess in range(2 ** 8) if guess_list[guess]]
 
@@ -107,7 +115,10 @@ def guess_k1_hd(plaintexts, hamming_distances, k0):
 
     r1 = np.empty(num_traces, dtype=bytearray)
 
-    ?
+    for j in range(num_traces):
+       r1_xored_with_round_key = bytes(aes.encrypt_r(plaintexts[j], end_round=2))
+       round_key = aes.get_round_key_bytes(1)
+       r1[j] = xor_bytes(r1_xored_with_round_key, round_key)
 
     return guess_key_hd(r1, hamming_distances, 1)
 
@@ -121,8 +132,27 @@ def recover_full_key(key_len, k0_list, k1_list):
     :return: list of candidates for the full key
     """
     full_key_list = []
+    
+    if key_len == 128:
+        for k0 in k0_list:
+            aes = AESr(k0, 2) # need only number of rounds that gives k1
+            k1 = bytes(aes.get_round_key_bytes(1))
+            if k1 in k1_list:
+                full_key_list.append(k0)
 
-    ?
+    if key_len == 192:
+        for k0 in k0_list:
+            for k1 in k1_list:
+                key = k0 + k1[:8]
+                aes = AESr(key, 2) # need only number of rounds that gives k1
+                if k1 == bytes(aes.get_round_key_bytes(1)):
+                    full_key_list.append(key)
+
+    if key_len == 256:
+        for k0 in k0_list:
+            for k1 in k1_list:
+                key = k0 + k1
+                full_key_list.append(key)
 
     # Remove duplicate keys
     return list(dict.fromkeys(full_key_list))
@@ -172,6 +202,29 @@ def power_analysis_attack(key_len, plaintexts, hamming_distances, verbose=False)
     return recover_full_key(key_len, k0_list, k1_list)
 
 
+def check_test_vectors_192():
+    num_traces = 10
+    plaintext_seed = 0
+
+    key = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'
+
+    # Generate random plaintexts
+    plaintexts = np.empty(num_traces, dtype=bytearray)
+    for i in range(num_traces):
+        sha = sha256()
+        sha.update(bytes([plaintext_seed]) + bytes([i]))
+        plaintexts[i] = sha.digest()[:BlockSize]
+
+    keyarr = bytes.fromhex(key)[:24]
+
+    hamming_distances = simulate_power_analysis(plaintexts, keyarr, 0, 2)
+
+    keys = power_analysis_attack(len(keyarr) * 8, plaintexts, hamming_distances, True)
+    for k in keys:
+        print(k.hex())
+
+
+
 def check_test_vectors():
     """
     Checks and prints test vectors on various functions
@@ -197,7 +250,6 @@ def check_test_vectors():
         print("simulate_power_analysis: Not Functional")
 
     key_list = guess_key_hd(plaintexts, hamming_distances, 0)
-
     k0_list = generate_key_options([[]], key_list)
 
     for i in range(len(k0_list)):
@@ -213,6 +265,9 @@ def check_test_vectors():
 
 
 if __name__ == "__main__":
+
+    check_test_vectors()
+    check_test_vectors_192()
 
     num_traces = 10
     plaintext_seed = 0
