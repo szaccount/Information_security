@@ -12,9 +12,6 @@ import copy
 
 BlockSize = 16
 
-def xor_bytes(ba1, ba2):
-    return bytes([b1 ^ b2 for b1, b2 in zip(ba1, ba2)])
-
 
 def hamming_weight(x):
     """
@@ -116,9 +113,9 @@ def guess_k1_hd(plaintexts, hamming_distances, k0):
     r1 = np.empty(num_traces, dtype=bytearray)
 
     for j in range(num_traces):
-       r1_xored_with_round_key = bytes(aes.encrypt_r(plaintexts[j], end_round=2))
-       round_key = aes.get_round_key_bytes(1)
-       r1[j] = xor_bytes(r1_xored_with_round_key, round_key)
+        r1[j] = bytes(
+           aes.encrypt_r(plaintexts[j], end_round=2, xorlastroundkey=False)
+        )
 
     return guess_key_hd(r1, hamming_distances, 1)
 
