@@ -85,10 +85,10 @@ def guess_key_hd(plaintexts, hamming_distances, r):
         guess_list = np.full(2 ** 8, True)
 
         for j in range(len(plaintexts)):
-            for l in range(2 ** 8):
-                stateround_i = plaintexts[j][i] ^ l
+            for guess in range(2 ** 8):
+                stateround_i = plaintexts[j][i] ^ guess
                 if hamming_weight(AESr.S[stateround_i] ^ stateround_i) != hamming_distances[j][r][i]:
-                    guess_list[l] = False
+                    guess_list[guess] = False
 
 
         key_list[i] = [guess for guess in range(2 ** 8) if guess_list[guess]]
