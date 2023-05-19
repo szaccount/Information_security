@@ -113,9 +113,7 @@ def guess_k1_hd(plaintexts, hamming_distances, k0):
     r1 = np.empty(num_traces, dtype=bytearray)
 
     for j in range(num_traces):
-        r1[j] = bytes(
-           aes.encrypt_r(plaintexts[j], end_round=2, xorlastroundkey=False)
-        )
+        r1[j] = bytes(aes.encrypt_r(plaintexts[j], end_round=2, xorlastroundkey=False))
 
     return guess_key_hd(r1, hamming_distances, 1)
 
