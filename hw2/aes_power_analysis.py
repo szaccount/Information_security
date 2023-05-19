@@ -212,7 +212,6 @@ def check_test_vectors_192():
         print(k.hex())
 
 
-
 def check_test_vectors():
     """
     Checks and prints test vectors on various functions
@@ -238,6 +237,7 @@ def check_test_vectors():
         print("simulate_power_analysis: Not Functional")
 
     key_list = guess_key_hd(plaintexts, hamming_distances, 0)
+
     k0_list = generate_key_options([[]], key_list)
 
     for i in range(len(k0_list)):
@@ -253,9 +253,6 @@ def check_test_vectors():
 
 
 if __name__ == "__main__":
-
-    check_test_vectors()
-    check_test_vectors_192()
 
     num_traces = 10
     plaintext_seed = 0
