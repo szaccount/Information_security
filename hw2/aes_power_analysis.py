@@ -129,26 +129,17 @@ def recover_full_key(key_len, k0_list, k1_list):
     :return: list of candidates for the full key
     """
     full_key_list = []
-    
-    if key_len == 128:
-        for k0 in k0_list:
-            aes = AESr(k0, 2) # need only number of rounds that gives k1
-            k1 = bytes(aes.get_round_key_bytes(1))
-            if k1 in k1_list:
-                full_key_list.append(k0)
 
-    if key_len == 192:
-        for k0 in k0_list:
-            for k1 in k1_list:
-                key = k0 + k1[:8]
-                aes = AESr(key, 2) # need only number of rounds that gives k1
-                if k1 == bytes(aes.get_round_key_bytes(1)):
-                    full_key_list.append(key)
+    assert key_len in [128, 192, 256], f"{key_len=} is not supported."
+    partial_k1_bytes = key_len // 8 - 16
 
-    if key_len == 256:
-        for k0 in k0_list:
-            for k1 in k1_list:
-                key = k0 + k1
+    for k0 in k0_list:
+        for k1 in k1_list:
+            key = k0 + k1[:partial_k1_bytes]
+            # Need only number of rounds that gives k1.
+            aes = AESr(key, 2)
+            # Make sure that k0 and k1 are the round keys corresponding to the full key.
+            if k0 == bytes(aes.get_round_key_bytes(0)) and k1 == bytes(aes.get_round_key_bytes(1)):
                 full_key_list.append(key)
 
     # Remove duplicate keys
