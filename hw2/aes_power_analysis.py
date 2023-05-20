@@ -64,7 +64,7 @@ def simulate_power_analysis(plaintexts, key, start_round, end_round):
         for r in range(max(start_round, 1), end_round + 1):
             stateround = aes.encrypt_r(plaintexts[j], r, start_round)
             for i in range(BlockSize):
-                ?
+                hamming_distances[j][r - 1][i] = hamming_weight(aes.S[stateround[i]] ^ stateround[i])
 
     return hamming_distances
 
@@ -84,7 +84,12 @@ def guess_key_hd(plaintexts, hamming_distances, r):
     for i in range(BlockSize):
         guess_list = np.full(2 ** 8, True)
 
-        ?
+        for j in range(len(plaintexts)):
+            for guess in range(2 ** 8):
+                stateround_i = plaintexts[j][i] ^ guess
+                if hamming_weight(AESr.S[stateround_i] ^ stateround_i) != hamming_distances[j][r][i]:
+                    guess_list[guess] = False
+
 
         key_list[i] = [guess for guess in range(2 ** 8) if guess_list[guess]]
 
@@ -107,7 +112,8 @@ def guess_k1_hd(plaintexts, hamming_distances, k0):
 
     r1 = np.empty(num_traces, dtype=bytearray)
 
-    ?
+    for j in range(num_traces):
+        r1[j] = bytes(aes.encrypt_r(plaintexts[j], end_round=2, xorlastroundkey=False))
 
     return guess_key_hd(r1, hamming_distances, 1)
 
@@ -122,7 +128,17 @@ def recover_full_key(key_len, k0_list, k1_list):
     """
     full_key_list = []
 
-    ?
+    assert key_len in [128, 192, 256], f"{key_len=} is not supported."
+    partial_k1_bytes = key_len // 8 - 16
+
+    for k0 in k0_list:
+        for k1 in k1_list:
+            key = k0 + k1[:partial_k1_bytes]
+            # Need only number of rounds that gives k1.
+            aes = AESr(key, 2)
+            # Make sure that k0 and k1 are the round keys corresponding to the full key.
+            if k0 == bytes(aes.get_round_key_bytes(0)) and k1 == bytes(aes.get_round_key_bytes(1)):
+                full_key_list.append(key)
 
     # Remove duplicate keys
     return list(dict.fromkeys(full_key_list))
@@ -170,6 +186,27 @@ def power_analysis_attack(key_len, plaintexts, hamming_distances, verbose=False)
     k1_list = list(dict.fromkeys(k1_list))
 
     return recover_full_key(key_len, k0_list, k1_list)
+
+
+def check_test_vectors_192():
+    num_traces = 10
+    plaintext_seed = 0
+
+    key = '000102030405060708090a0b0c0d0e0f1011121314151617'
+    keyarr = bytes.fromhex(key)
+
+    # Generate random plaintexts
+    plaintexts = np.empty(num_traces, dtype=bytearray)
+    for i in range(num_traces):
+        sha = sha256()
+        sha.update(bytes([plaintext_seed]) + bytes([i]))
+        plaintexts[i] = sha.digest()[:BlockSize]
+
+    hamming_distances = simulate_power_analysis(plaintexts, keyarr, 0, 2)
+
+    keys = power_analysis_attack(len(keyarr) * 8, plaintexts, hamming_distances, True)
+    for k in keys:
+        print(k.hex())
 
 
 def check_test_vectors():
