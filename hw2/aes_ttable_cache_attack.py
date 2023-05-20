@@ -415,7 +415,7 @@ def check_test_vectors():
     k0_high_list = generate_key_options([[]], key_list)
     k0_list = []
     for k0 in k0_high_list:
-        key_list = guess_key_ttable(plaintexts, unaccessed_list, k0, False) # was True chagne !!!!!!
+        key_list = guess_key_ttable(plaintexts, unaccessed_list, k0, True)
         k0_list += copy.copy(key_list)
 
     # Remove duplicate keys
