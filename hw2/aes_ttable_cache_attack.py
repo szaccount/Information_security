@@ -10,6 +10,7 @@ import numpy as np
 from hashlib import sha256
 import copy
 
+
 BlockSize = 16
 NumTables = 4
 
@@ -66,7 +67,8 @@ def simulate_cache_access(plaintexts, key, start_round, end_round):
     :param key: encryption key
     :param start_round: first round to gain traces from
     :param end_round: final round to gain traces from
-    :return: accessed_list, where accessed_list[j][i] is a list of the top-half nibbles used to access table i in trace j
+    :return: accessed_list, where accessed_list[j][i] is a list of the top-half
+             nibbles used to access table i in trace j
     """
     aes = AESr(key, end_round)
 
@@ -82,7 +84,8 @@ def simulate_cache_access(plaintexts, key, start_round, end_round):
             stateround = aes.encrypt_r(plaintexts[j], r, start_round)
             for i in range(NumTables):
                 for l in range(int(BlockSize / NumTables)):
-                    accessed_list[j][i].append( ? )
+                    # The computation with the mod is for the byte used to access table i when computing column l (after shift rows).
+                    accessed_list[j][i].append(stateround[(NumTables * l + (i * int(BlockSize / NumTables + 1))) % BlockSize] &0xF0)
 
     # Remove ordering of accesses, so as to not leak in which round each access happened.
     for j in range(num_traces):
@@ -121,7 +124,8 @@ def guess_key_high(plaintexts, unaccessed_list):
     """
     Guesses a partial round key, comprised of the top nibble of each byte
     :param plaintexts: list of plaintexts
-    :param unaccessed_list: unaccessed_list[i][j] is a list of the top-half nibbles not used to access table i in trace j
+    :param unaccessed_list: unaccessed_list[i][j] is a list of the
+    top-half nibbles not used to access table i in trace j
     :return: list of guesses for each column
     """
     num_traces = len(plaintexts)
@@ -132,7 +136,10 @@ def guess_key_high(plaintexts, unaccessed_list):
             guess_list = np.full(2 ** 4, True)
             for j in range(num_traces):
                 for nibble in unaccessed_list[j][i]:
-                    ?
+                    # Here didn't use the (NumTables * l + (i * int(BlockSize / NumTables + 1)))
+                    # because of what is used in the index of key_list which was already implemented.
+                    plain_nibble = plaintexts[j][(i + NumTables * l) % BlockSize] & 0xF0
+                    guess_list[(plain_nibble ^ nibble) >> 4] = False
             key_list[(i + NumTables * l) % BlockSize] = [guess << 4 for guess in range(2 ** 4) if guess_list[guess]]
 
     return key_list
@@ -150,7 +157,13 @@ def calc_ttables(l, plaintexts, partial_k0_high):
     num_traces = len(plaintexts)
     T_result = np.empty((num_traces, 2 ** 4, NumTables), dtype=np.uint32)
 
-    ?
+    Ts = [AES.T1, AES.T2, AES.T3, AES.T4]
+    for j in range(num_traces):
+        for i in range(NumTables):
+            for bottom_nibble in range(2**4):
+                key_byte = partial_k0_high[i] ^ bottom_nibble
+                # The computation with the mod is for the byte used to access table i when computing column l (after shift rows).
+                T_result[j][bottom_nibble][i] = (Ts[i])[plaintexts[j][(NumTables * l + (i * int(BlockSize / NumTables + 1))) % BlockSize] ^ key_byte]
 
     return T_result
 
@@ -169,9 +182,18 @@ def find_unviable_candidates(j, T_result, k0_low, viable):
     k0_2 = k0_low >> 4 & 0xf
     k0_3 = k0_low & 0xf
 
+    k0_list = [k0_0, k0_1, k0_2, k0_3]
+
     unviable = []
 
-    ?
+    for i in range(NumTables):
+        for k1_nibble in range(2**4):
+            k1_nibble_full = k1_nibble << 4
+            column = (T_result[j][k0_list[0]][0] ^ T_result[j][k0_list[1]][1] ^ T_result[j][k0_list[2]][2] ^ T_result[j][k0_list[3]][3])
+            column_cell_i = (column >> ((NumTables - i - 1) * 8)) & 0xFF
+            access = (column_cell_i ^ k1_nibble_full) >> 4
+            if not viable[access][i]:
+                unviable.append((k1_nibble, i))
 
     return unviable
 
@@ -260,7 +282,8 @@ def guess_k1_ttable(plaintexts, unaccessed_list, k0, verbose=False):
 
     r1 = np.empty(num_traces, dtype=bytearray)
 
-    ?
+    for j in range(num_traces):
+        r1[j] = bytes(aes.encrypt_r(plaintexts[j], end_round=2, xorlastroundkey=False))
 
     key_list = guess_key_high(r1, unaccessed_list)
 
@@ -285,7 +308,17 @@ def recover_full_key(key_len, k0_list, k1_list):
     """
     full_key_list = []
 
-    ?
+    assert key_len in [128, 192, 256], f"{key_len=} is not supported."
+    partial_k1_bytes = key_len // 8 - 16
+
+    for k0 in k0_list:
+        for k1 in k1_list:
+            key = k0 + k1[:partial_k1_bytes]
+            # Need only number of rounds that gives k1.
+            aes = AESr(key, 2)
+            # Make sure that k0 and k1 are the round keys corresponding to the full key.
+            if k0 == bytes(aes.get_round_key_bytes(0)) and k1 == bytes(aes.get_round_key_bytes(1)):
+                full_key_list.append(key)
 
     # Remove duplicate keys
     return list(dict.fromkeys(full_key_list))
@@ -392,6 +425,28 @@ def check_test_vectors():
         print("guess_key_ttable: Functional")
     else:
         print("guess_key_ttable: Not Functional")
+
+
+def check_test_vectors_192(): # Our funcion
+    print("Our 192 bit key test")
+    num_traces = 15
+    plaintext_seed = 0
+
+    key = '00112233445566778899aabbccddeeff1011121314151617'
+
+    plaintexts = np.empty(num_traces, dtype=bytearray)
+    for i in range(num_traces):
+        sha = sha256()
+        sha.update(bytes([plaintext_seed]) + bytes([i]))
+        plaintexts[i] = sha.digest()[:BlockSize]
+
+    keyarr = bytes.fromhex(key)
+
+    accessed_list = simulate_cache_access(plaintexts, keyarr, 0, 3)
+
+    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
+    for k in keys:
+        print(k.hex())
 
 
 if __name__ == "__main__":
