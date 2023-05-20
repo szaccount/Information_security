@@ -9,10 +9,7 @@ from softAESr import AESr
 import numpy as np
 from hashlib import sha256
 import copy
-import struct
 
-# our imports
-import itertools
 
 BlockSize = 16
 NumTables = 4
@@ -87,6 +84,7 @@ def simulate_cache_access(plaintexts, key, start_round, end_round):
             stateround = aes.encrypt_r(plaintexts[j], r, start_round)
             for i in range(NumTables):
                 for l in range(int(BlockSize / NumTables)):
+                    # The computation with the mod is for the byte used to access table i when computing column l (after shift rows).
                     accessed_list[j][i].append(stateround[(NumTables * l + (i * int(BlockSize / NumTables + 1))) % BlockSize] &0xF0)
 
     # Remove ordering of accesses, so as to not leak in which round each access happened.
@@ -164,6 +162,7 @@ def calc_ttables(l, plaintexts, partial_k0_high):
         for i in range(NumTables):
             for bottom_nibble in range(2**4):
                 key_byte = partial_k0_high[i] ^ bottom_nibble
+                # The computation with the mod is for the byte used to access table i when computing column l (after shift rows).
                 T_result[j][bottom_nibble][i] = (Ts[i])[plaintexts[j][(NumTables * l + (i * int(BlockSize / NumTables + 1))) % BlockSize] ^ key_byte]
 
     return T_result
