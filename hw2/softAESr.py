@@ -64,54 +64,6 @@ class AESr(AES):
             result.append(t[i]        & 0xFF)
 
         return result
-    
-    ######################################################
-
-    def encrypt_r_modified(self, plaintext, end_round, start_round=0):
-        """
-        Encrypt a block of plain text using the AES block cipher.
-        """
-
-        if len(plaintext) != 16:
-            print('plaintext len', len(plaintext))
-            raise ValueError('wrong block length')
-
-        if end_round >= len(self._Ke):
-            raise Exception("not enough key for partial encryption")
-
-        (s1, s2, s3) = [1, 2, 3]
-        a = [0, 0, 0, 0]
-
-        if start_round == 0:
-            # Convert plaintext to (ints ^ key)
-            t = [(_compact_word(plaintext[4 * i:4 * i + 4]) ^ self._Ke[0][i]) for i in range(0, 4)]
-            first_round = 1
-        else:
-            # If we begin from partial encryption then no key is XORed at the beginning
-            t = [(_compact_word(plaintext[4 * i:4 * i + 4])) for i in range(0, 4)]
-            first_round = start_round
-
-        # Apply round transforms
-        for r in range(first_round, end_round):
-            for i in range(0, 4):
-                a[i] = (self.T1[(t[ i          ] >> 24) & 0xFF] ^
-                        self.T2[(t[(i + s1) % 4] >> 16) & 0xFF] ^
-                        self.T3[(t[(i + s2) % 4] >>  8) & 0xFF] ^
-                        self.T4[ t[(i + s3) % 4]        & 0xFF])
-            t = copy.copy(a)
-
-        # The last round is special
-        result = []
-
-        for i in range(0, 4):
-            result.append((t[i] >> 24) & 0xFF)
-            result.append((t[i] >> 16) & 0xFF)
-            result.append((t[i] >> 8) & 0xFF)
-            result.append(t[i]        & 0xFF)
-
-        return result
-    
-    ######################################################
 
     def encrypt_raw_r(self, plaintext, rounds):
         plaintext_arr = array.array('B', plaintext)

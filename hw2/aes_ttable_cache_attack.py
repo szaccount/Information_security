@@ -139,7 +139,7 @@ def guess_key_high(plaintexts, unaccessed_list):
             for j in range(num_traces):
                 for nibble in unaccessed_list[j][i]:
                     # Here didn't use the (NumTables * l + (i * int(BlockSize / NumTables + 1)))
-                    # since what is used in the index of key_list which was already implemented.
+                    # because of what is used in the index of key_list which was already implemented.
                     plain_nibble = plaintexts[j][(i + NumTables * l) % BlockSize] & 0xF0
                     guess_list[(plain_nibble ^ nibble) >> 4] = False
             key_list[(i + NumTables * l) % BlockSize] = [guess << 4 for guess in range(2 ** 4) if guess_list[guess]]
@@ -183,11 +183,11 @@ def find_unviable_candidates(j, T_result, k0_low, viable):
     k0_2 = k0_low >> 4 & 0xf
     k0_3 = k0_low & 0xf
 
-    k0_list = [k0_0, k0_1, k0_2, k0_3] # !!!!!!! perhaps opposite order
+    k0_list = [k0_0, k0_1, k0_2, k0_3]
 
     unviable = []
 
-    for i in range(NumTables): # verify what is i NumTables
+    for i in range(NumTables):
         for k1_nibble in range(2**4):
             k1_nibble_full = k1_nibble << 4
             column = (T_result[j][k0_list[0]][0] ^ T_result[j][k0_list[1]][1] ^ T_result[j][k0_list[2]][2] ^ T_result[j][k0_list[3]][3])
@@ -284,10 +284,7 @@ def guess_k1_ttable(plaintexts, unaccessed_list, k0, verbose=False):
     r1 = np.empty(num_traces, dtype=bytearray)
 
     for j in range(num_traces):
-        # Our comment: instead of using the modified version can call the regular and xor it with get_round_key_bytes(1) of k0
-        r1[j] = bytes(aes.encrypt_r_modified(plaintexts[j], end_round=2))
-        # r1[j] = bytes(aes.encrypt_r_modified(plaintexts[j], end_round=2, xorlastroundkey=False))
-        print(f"############### {r1[j]=}")
+        r1[j] = bytes(aes.encrypt_r(plaintexts[j], end_round=2, xorlastroundkey=False))
 
     key_list = guess_key_high(r1, unaccessed_list)
 
@@ -312,29 +309,16 @@ def recover_full_key(key_len, k0_list, k1_list):
     """
     full_key_list = []
 
-    print(f"{key_len=} {len(k0_list)=} {len(k1_list)=} {k0_list=} {k1_list=}")
-    if key_len != 128 and key_len != 256:
-        print("THIS IS VERY VERY BAD HANDLE IT") # TODO handle it !!!!!!!!
-    
-    if key_len == 128:
-        for k0 in k0_list:
-            aes = AESr(k0, 2) # need only number of rounds that gives k1
-            k1 = bytes(aes.get_round_key_bytes(1))
-            if k1 in k1_list:
-                full_key_list.append(k0)
+    assert key_len in [128, 192, 256], f"{key_len=} is not supported."
+    partial_k1_bytes = key_len // 8 - 16
 
-    if key_len == 192:
-        for k0 in k0_list:
-            for k1 in k1_list:
-                key = k0 + k1[:8]
-                aes = AESr(key, 2) # need only number of rounds that gives k1
-                if k1 == bytes(aes.get_round_key_bytes(1)):
-                    full_key_list.append(key)
-    
-    if key_len == 256:
-        for k0 in k0_list:
-            for k1 in k1_list:
-                key = k0 + k1
+    for k0 in k0_list:
+        for k1 in k1_list:
+            key = k0 + k1[:partial_k1_bytes]
+            # Need only number of rounds that gives k1.
+            aes = AESr(key, 2)
+            # Make sure that k0 and k1 are the round keys corresponding to the full key.
+            if k0 == bytes(aes.get_round_key_bytes(0)) and k1 == bytes(aes.get_round_key_bytes(1)):
                 full_key_list.append(key)
 
     # Remove duplicate keys
@@ -360,7 +344,7 @@ def cache_attack(key_len, plaintexts, accessed_list, verbose=False):
 
     k0_high_list = generate_key_options([[]], key_list)
     k0_list = []
-    for k0 in k0_high_list: # !!!!!!!!!!!!!!!!!!!!!!!!!!
+    for k0 in k0_high_list:
         key_list = guess_key_ttable(plaintexts, unaccessed_list, k0, verbose)
         if verbose:
             print("Number of k0 options: ", len(key_list))
@@ -422,8 +406,6 @@ def check_test_vectors():
         for nibble in unaccessed_list[0][i]:
             viable[nibble >> 4][i] = False
 
-    print("HERE")
-    print(find_unviable_candidates(0, T_result, 0, viable))
     if set(find_unviable_candidates(0, T_result, 0, viable)) == {(2, 0), (5, 0), (7, 0), (8, 0), (11, 0), (13, 0), (4, 1), (5, 1), (6, 1), (8, 1), (9, 1), (10, 1), (13, 1), (6, 2), (7, 2), (8, 2), (9, 2), (14, 2), (0, 3), (1, 3), (3, 3), (5, 3), (6, 3), (11, 3), (13, 3)}:
         print("find_unviable_candidates: Functional")
     else:
@@ -458,24 +440,12 @@ def check_test_vectors_192(): # Our funcion
         sha = sha256()
         sha.update(bytes([plaintext_seed]) + bytes([i]))
         plaintexts[i] = sha.digest()[:BlockSize]
-        print(f"Debugging {plaintexts[i]=}") # DELETE this
 
     keyarr = bytes.fromhex(key)
 
     accessed_list = simulate_cache_access(plaintexts, keyarr, 0, 3)
 
-    ###############
-    # k0 = b'\x00\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff'
-    # unaccessed_list = find_unaccessed(accessed_list)
-    # key_list = guess_k1_ttable(plaintexts, unaccessed_list, k0, True)
-    # print(f"Printing k1 list debug {key_list}")
-    # pass
-    ###############
-
-    # check_test_vectors()
-
-    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True) # was True remove this line !!!!
-    # keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
+    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
     for k in keys:
         print(k.hex())
 
@@ -493,23 +463,11 @@ if __name__ == "__main__":
         sha = sha256()
         sha.update(bytes([plaintext_seed]) + bytes([i]))
         plaintexts[i] = sha.digest()[:BlockSize]
-        print(f"Debugging {plaintexts[i]=}") # DELETE this
 
     keyarr = bytes.fromhex(key)
 
     accessed_list = simulate_cache_access(plaintexts, keyarr, 0, 3)
 
-    ###############
-    k0 = b'\x00\x11"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff'
-    unaccessed_list = find_unaccessed(accessed_list)
-    key_list = guess_k1_ttable(plaintexts, unaccessed_list, k0, True)
-    print(f"Printing k1 list debug {key_list}")
-    pass
-    ###############
-
-    check_test_vectors()
-
-    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, False) # was True remove this line !!!!
-    # keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
+    keys = cache_attack(len(keyarr) * 8, plaintexts, accessed_list, True)
     for k in keys:
         print(k.hex())
