@@ -192,7 +192,8 @@ def check_test_vectors_192():
     num_traces = 10
     plaintext_seed = 0
 
-    key = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'
+    key = '000102030405060708090a0b0c0d0e0f1011121314151617'
+    keyarr = bytes.fromhex(key)
 
     # Generate random plaintexts
     plaintexts = np.empty(num_traces, dtype=bytearray)
@@ -200,8 +201,6 @@ def check_test_vectors_192():
         sha = sha256()
         sha.update(bytes([plaintext_seed]) + bytes([i]))
         plaintexts[i] = sha.digest()[:BlockSize]
-
-    keyarr = bytes.fromhex(key)[:24]
 
     hamming_distances = simulate_power_analysis(plaintexts, keyarr, 0, 2)
 
