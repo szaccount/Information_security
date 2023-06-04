@@ -91,7 +91,9 @@ def blinding(k, key, c, oracle):
     while True:
         s_0 = urandom(k)
         s_0 = int.from_bytes(s_0, byteorder='big') % key.n
-        ?
+        c_attempt = (c * pow(s_0, key.e, key.n)) % key.n
+        if oracle.query(c_attempt.to_bytes(k, byteorder='big')):
+            return s_0, c_attempt
 
 
 def find_min_conforming(k, key, c_0, min_s, oracle):
