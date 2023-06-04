@@ -6,6 +6,11 @@ from oracles import PKCS1_v1_5_Oracle
 from os import urandom
 from Crypto.PublicKey import RSA
 
+#### Added this
+from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+
 
 def egcd(a, b):
     """
@@ -88,7 +93,11 @@ def blinding(k, key, c, oracle):
     """
     if oracle.query(c.to_bytes(k, byteorder='big')):
         return 1, c
+    indx = 0 # Added index for information
     while True:
+        indx += 1
+        if indx % 200 == 0:
+            print(f"{indx}")
         s_0 = urandom(k)
         s_0 = int.from_bytes(s_0, byteorder='big') % key.n
         c_attempt = (c * pow(s_0, key.e, key.n)) % key.n
@@ -106,7 +115,11 @@ def find_min_conforming(k, key, c_0, min_s, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: smallest s >= min_s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
-    ?
+    while True:
+        # s_0 = int.from_bytes(s_0, byteorder='big') % key.n
+        c_attempt = (c_0 * pow(min_s, key.e, key.n)) % key.n
+        if oracle.query(c_attempt.to_bytes(k, byteorder='big')):
+            return min_s
 
 
 def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
@@ -122,7 +135,7 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
-    ?
+    # ?
 
 
 def narrow_m(key, m_prev, s, B):
@@ -134,16 +147,16 @@ def narrow_m(key, m_prev, s, B):
     :param B: 2 ** (8 * (k - 2))
     :return: New narrowed-down intervals
     """
-    intervals = []
-    for a, b in m_prev:
-        min_r = ?
-        max_r = ?
-        for r in range(min_r, max_r + 1):
-            start = ?
-            end = ?
-            intervals.append((start, end))
+    # intervals = []
+    # for a, b in m_prev:
+        # min_r = ?
+        # max_r = ?
+        # for r in range(min_r, max_r + 1):
+            # start = ?
+            # end = ?
+            # intervals.append((start, end))
 
-    return merge_intervals(intervals)
+    # return merge_intervals(intervals)
 
 
 def bleichenbacher_attack(k, key, c, oracle, verbose=False):
@@ -159,6 +172,8 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
 
     c = int.from_bytes(c, byteorder='big')
     s_0, c_0 = blinding(k, key, c, oracle)
+
+    print(f"{s_0=} {c_0=}")
 
     if verbose:
         print("Blinding complete")
@@ -181,7 +196,7 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
         m = narrow_m(key, m, s, B)
 
         if len(m) == 1 and m[0][0] == m[0][1]:
-            result = ?
+            # result = ?
             break
         i += 1
 
@@ -201,7 +216,20 @@ if __name__ == "__main__":
 
     oracle = PKCS1_v1_5_Oracle(key)
 
+    # good_m = b'\x00\x02' + 8 * b'\x11' + b'\x00' + (k - 11) * b'\x01'
+    # bad_m = b'\x00\x00' + 8 * b'\x11' + b'\x00' + (k - 11) * b'\x01'
+    # print(len(good_m))
     c = b'\x00' + (k - 1) * bytes([1])
+    cipher = PKCS1_v1_5.new(key)
+    signature = pkcs1_15.new(key)
 
+    good_c = cipher.encrypt(b"hello")
+    bad_c = signature.sign(SHA256.new(b"hello"))
+
+    # result = bleichenbacher_attack(k, pub_key, good_c, oracle, True)
+    # print(result)
+    result = bleichenbacher_attack(k, pub_key, bad_c, oracle, True)
+    print(result)
+    
     result = bleichenbacher_attack(k, pub_key, c, oracle, True)
     print(result)
