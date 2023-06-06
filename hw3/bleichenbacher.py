@@ -81,6 +81,15 @@ def merge_intervals(intervals):
     merged.append(curr)
     return merged
 
+########## our function
+def compute_c_attempt(s, c, key):
+    return (c * pow(s, key.e, key.n)) % key.n
+
+def check_s_passes_query(s, c, k, key, oracle):
+    c_attempt = compute_c_attempt(s, c, key)
+    return oracle.query(c_attempt.to_bytes(k, byteorder='big'))
+########## our function
+
 
 def blinding(k, key, c, oracle):
     """
@@ -96,12 +105,11 @@ def blinding(k, key, c, oracle):
     indx = 0 # Added index for information
     while True:
         indx += 1
-        if indx % 200 == 0:
-            print(f"{indx}")
         s_0 = urandom(k)
         s_0 = int.from_bytes(s_0, byteorder='big') % key.n
-        c_attempt = (c * pow(s_0, key.e, key.n)) % key.n
-        if oracle.query(c_attempt.to_bytes(k, byteorder='big')):
+        if check_s_passes_query(s_0, c, k, key, oracle):
+            print(f"Finished blinding in {indx=}")
+            c_attempt = compute_c_attempt(s_0, c, key)
             return s_0, c_attempt
 
 
@@ -115,11 +123,12 @@ def find_min_conforming(k, key, c_0, min_s, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: smallest s >= min_s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
+    next_s = min_s
     while True:
         # s_0 = int.from_bytes(s_0, byteorder='big') % key.n
-        c_attempt = (c_0 * pow(min_s, key.e, key.n)) % key.n
-        if oracle.query(c_attempt.to_bytes(k, byteorder='big')):
-            return min_s
+        if check_s_passes_query(next_s, c_0, k, key, oracle):
+            return next_s
+        next_s += 1
 
 
 def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
@@ -135,7 +144,18 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
-    # ?
+    r_lower_bound = 2 * divceil(((b * prev_s) - (2 * B)), key.n)
+    next_r = r_lower_bound
+    while True:
+        s_lower_bound = divceil((2 * B) + (next_r * key.n), b)
+        s_upper_bound = divfloor((3 * B) + (next_r * key.n), a)
+        for s_option in range(s_lower_bound, s_upper_bound):
+            if check_s_passes_query(s_option, c_0, k, key, oracle):
+                return s_option
+        next_r += 1
+        
+
+
 
 
 def narrow_m(key, m_prev, s, B):
@@ -147,16 +167,20 @@ def narrow_m(key, m_prev, s, B):
     :param B: 2 ** (8 * (k - 2))
     :return: New narrowed-down intervals
     """
-    # intervals = []
-    # for a, b in m_prev:
-        # min_r = ?
-        # max_r = ?
-        # for r in range(min_r, max_r + 1):
-            # start = ?
-            # end = ?
-            # intervals.append((start, end))
+    intervals = []
+    for a, b in m_prev:
+        min_r = divceil((a * s) - (3 * B) + 1, key.n)
+        max_r = divfloor((b * s) - (2 * B), key.n)
+        for r in range(min_r, max_r + 1):
+            start = max(a, divceil((2 * B) + (r * key.n), s))
+            end = min(b, divfloor((3 * b) - 1 + (r * key.n), s))
+            ## we added this check
+            if start > end:
+                continue
+            ## we added this check
+            intervals.append((start, end))
 
-    # return merge_intervals(intervals)
+    return merge_intervals(intervals)
 
 
 def bleichenbacher_attack(k, key, c, oracle, verbose=False):
@@ -186,24 +210,32 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
             print("Round ", i)
         if i == 1:
             s = find_min_conforming(k, key, c_0, divceil(key.n, 3 * B), oracle)
+            print(f"Got to first find_min returned {s=}")
         elif len(m) > 1:
             s = find_min_conforming(k, key, c_0, s + 1, oracle)
+            print(f"Got to second find_min returned {s=}")
         else:
             a = m[0][0]
             b = m[0][1]
             s = search_single_interval(k, key, B, s, a, b, c_0, oracle)
+            print(f"Got to third find_min returned {s=}")
 
+        print(f"before narrow {len(m)=}")
         m = narrow_m(key, m, s, B)
+        print(f"after narrow {len(m)=}")
 
+        print(f"Intervals: {m}")
         if len(m) == 1 and m[0][0] == m[0][1]:
-            # result = ?
+            result = (m[0][0] * modinv(s_0, key.n)) % key.n
             break
         i += 1
 
     # Test the result
     if pow(result, key.e, key.n) == c:
+        print("Yay")
         return result.to_bytes(k, byteorder='big')
     else:
+        print("Nay")
         return None
 
 
@@ -212,6 +244,7 @@ if __name__ == "__main__":
 
     key = RSA.generate(n_length)
     pub_key = key.public_key()
+    print(f"{pub_key.e=}, {pub_key.n=}")
     k = int(n_length / 8)
 
     oracle = PKCS1_v1_5_Oracle(key)
@@ -226,10 +259,10 @@ if __name__ == "__main__":
     good_c = cipher.encrypt(b"hello")
     bad_c = signature.sign(SHA256.new(b"hello"))
 
-    # result = bleichenbacher_attack(k, pub_key, good_c, oracle, True)
-    # print(result)
-    result = bleichenbacher_attack(k, pub_key, bad_c, oracle, True)
+    result = bleichenbacher_attack(k, pub_key, good_c, oracle, True)
     print(result)
+    # result = bleichenbacher_attack(k, pub_key, bad_c, oracle, True)
+    # print(result)
     
     result = bleichenbacher_attack(k, pub_key, c, oracle, True)
     print(result)
