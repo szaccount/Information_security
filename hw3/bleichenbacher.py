@@ -144,13 +144,17 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
-    r_lower_bound = 2 * divceil(((b * prev_s) - (2 * B)), key.n)
+    r_lower_bound = divceil(2 * ((b * prev_s) - (2 * B)), key.n)
     next_r = r_lower_bound
     while True:
         s_lower_bound = divceil((2 * B) + (next_r * key.n), b)
         s_upper_bound = divfloor((3 * B) + (next_r * key.n), a)
+        # print(f"{s_lower_bound=} {s_upper_bound=} {(s_lower_bound < s_upper_bound)=}")
+        if s_lower_bound >= s_upper_bound:
+            print("Lower bound bigger than upper")
         for s_option in range(s_lower_bound, s_upper_bound):
             if check_s_passes_query(s_option, c_0, k, key, oracle):
+                print("!!!!!!!!!!!! Passed 2c")
                 return s_option
         next_r += 1
         
@@ -175,10 +179,9 @@ def narrow_m(key, m_prev, s, B):
             start = max(a, divceil((2 * B) + (r * key.n), s))
             end = min(b, divfloor((3 * b) - 1 + (r * key.n), s))
             ## we added this check
-            if start > end:
-                continue
+            if start <= end:
             ## we added this check
-            intervals.append((start, end))
+                intervals.append((start, end))
 
     return merge_intervals(intervals)
 
