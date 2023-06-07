@@ -148,7 +148,7 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     next_r = r_lower_bound
     while True:
         s_lower_bound = divceil((2 * B) + (next_r * key.n), b)
-        s_upper_bound = divfloor((3 * B) + (next_r * key.n), a)
+        s_upper_bound = divceil((3 * B) + (next_r * key.n), a) # was floor
         # print(f"{s_lower_bound=} {s_upper_bound=} {(s_lower_bound < s_upper_bound)=}")
         if s_lower_bound >= s_upper_bound:
             print("Lower bound bigger than upper")
