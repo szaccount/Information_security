@@ -6,6 +6,11 @@ from oracles import PKCS1_v1_5_Oracle
 from os import urandom
 from Crypto.PublicKey import RSA
 
+#### Added this for custom checks
+# from Crypto.Cipher import PKCS1_v1_5
+# from Crypto.Signature import pkcs1_15
+# from Crypto.Hash import SHA256
+
 
 def egcd(a, b):
     """
@@ -76,6 +81,19 @@ def merge_intervals(intervals):
     merged.append(curr)
     return merged
 
+def compute_c_attempt(s, c, key):
+    """
+    Returns the option for new c based on passed parameters.
+    """
+    return (c * pow(s, key.e, key.n)) % key.n
+
+def check_s_passes_query(s, c, k, key, oracle):
+    """
+    Returns True iff suggested s gives result that passes PKCS oracle query.
+    """
+    c_attempt = compute_c_attempt(s, c, key)
+    return oracle.query(c_attempt.to_bytes(k, byteorder='big'))
+
 
 def blinding(k, key, c, oracle):
     """
@@ -91,7 +109,9 @@ def blinding(k, key, c, oracle):
     while True:
         s_0 = urandom(k)
         s_0 = int.from_bytes(s_0, byteorder='big') % key.n
-        ?
+        if check_s_passes_query(s_0, c, k, key, oracle):
+            c_attempt = compute_c_attempt(s_0, c, key)
+            return s_0, c_attempt
 
 
 def find_min_conforming(k, key, c_0, min_s, oracle):
@@ -104,7 +124,11 @@ def find_min_conforming(k, key, c_0, min_s, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: smallest s >= min_s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
-    ?
+    next_s = min_s
+    while True:
+        if check_s_passes_query(next_s, c_0, k, key, oracle):
+            return next_s
+        next_s += 1
 
 
 def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
@@ -120,7 +144,21 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     :param oracle: oracle that checks ciphertext conformity
     :return: s s.t. (c_0 * (s ** e)) mod n represents a conforming ciphertext
     """
-    ?
+    r_lower_bound = divceil(2 * ((b * prev_s) - (2 * B)), key.n)
+    next_r = r_lower_bound
+    while True:
+        # Use `divceil` in order to get integers.
+        # For the upper bound, we use ceil (and not floor) as we enumerate until the last integer
+        # smaller than `s_upper_bound`, and we want the floor value to be included in this range.
+        s_lower_bound = divceil((2 * B) + (next_r * key.n), b)
+        s_upper_bound = divceil((3 * B) + (next_r * key.n), a)
+        for s_option in range(s_lower_bound, s_upper_bound):
+            if check_s_passes_query(s_option, c_0, k, key, oracle):
+                return s_option
+        next_r += 1
+        
+
+
 
 
 def narrow_m(key, m_prev, s, B):
@@ -134,12 +172,13 @@ def narrow_m(key, m_prev, s, B):
     """
     intervals = []
     for a, b in m_prev:
-        min_r = ?
-        max_r = ?
+        min_r = divceil((a * s) - (3 * B) + 1, key.n)
+        max_r = divfloor((b * s) - (2 * B), key.n)
         for r in range(min_r, max_r + 1):
-            start = ?
-            end = ?
-            intervals.append((start, end))
+            start = max(a, divceil((2 * B) + (r * key.n), s))
+            end = min(b, divfloor((3 * B) - 1 + (r * key.n), s))
+            if start <= end:
+                intervals.append((start, end))
 
     return merge_intervals(intervals)
 
@@ -179,7 +218,7 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
         m = narrow_m(key, m, s, B)
 
         if len(m) == 1 and m[0][0] == m[0][1]:
-            result = ?
+            result = (m[0][0] * modinv(s_0, key.n)) % key.n
             break
         i += 1
 
@@ -201,5 +240,18 @@ if __name__ == "__main__":
 
     c = b'\x00' + (k - 1) * bytes([1])
 
+    ###### custom checks
+    # cipher = PKCS1_v1_5.new(key)
+    # signature = pkcs1_15.new(key)
+
+    # good_c = cipher.encrypt(b"hello")
+    # bad_c = signature.sign(SHA256.new(b"hello"))
+
+    # result = bleichenbacher_attack(k, pub_key, good_c, oracle, True)
+    # print(result)
+    # result = bleichenbacher_attack(k, pub_key, bad_c, oracle, True)
+    # print(result)
+    ###### custom checks
+    
     result = bleichenbacher_attack(k, pub_key, c, oracle, True)
     print(result)
