@@ -89,7 +89,7 @@ def compute_c_attempt(s, c, key):
 
 def check_s_passes_query(s, c, k, key, oracle):
     """
-    Returns if suggested s gives result that passes PKCS oracle query.
+    Returns True iff suggested s gives result that passes PKCS oracle query.
     """
     c_attempt = compute_c_attempt(s, c, key)
     return oracle.query(c_attempt.to_bytes(k, byteorder='big'))
@@ -147,6 +147,9 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     r_lower_bound = divceil(2 * ((b * prev_s) - (2 * B)), key.n)
     next_r = r_lower_bound
     while True:
+        # Use `divceil` in order to get integers.
+        # For the upper bound, we use ceil (and not floor) as we enumerate until the last integer
+        # smaller than `s_upper_bound`, and we want the floor value to be included in this range.
         s_lower_bound = divceil((2 * B) + (next_r * key.n), b)
         s_upper_bound = divceil((3 * B) + (next_r * key.n), a)
         for s_option in range(s_lower_bound, s_upper_bound):
@@ -174,9 +177,7 @@ def narrow_m(key, m_prev, s, B):
         for r in range(min_r, max_r + 1):
             start = max(a, divceil((2 * B) + (r * key.n), s))
             end = min(b, divfloor((3 * B) - 1 + (r * key.n), s))
-            ## we added this check
             if start <= end:
-            ## we added this check
                 intervals.append((start, end))
 
     return merge_intervals(intervals)
