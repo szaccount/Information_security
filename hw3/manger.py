@@ -31,14 +31,22 @@ def divfloor(a, b):
     return q
 
 
-########## our function
 def compute_c_attempt(f, c, key):
+    """
+    @adidiner @szaccount function.
+    Computes `(c * f ** key.e) mod key.n`.
+    """
     return (c * pow(f, key.e, key.n)) % key.n
 
+
 def check_less_than_B(f, c, k, key, oracle):
+    """
+    @adidiner @szaccount function.
+    Returns True iff trying `f` with the oracle returns less than B.
+    I.e, `f * m` is less than B, `m` is the plaintext corresponding to `c`.
+    """
     c_attempt = compute_c_attempt(f, c, key)
     return oracle.query(c_attempt.to_bytes(k, byteorder='big'))
-########## our function
 
 
 def find_f1(k, key, c, oracle):
@@ -95,10 +103,10 @@ def find_m(k, key, c, f2, oracle, verbose=False):
         f_tmp = divfloor(2 * B, m_max - m_min)
         i = divfloor(f_tmp * m_min, key.n)
         f3 = divceil(i * key.n, m_min)
-        if not check_less_than_B(f3, c, k, key, oracle):
-            m_min = divceil((i * key.n) + B, f3)
-        else:
+        if check_less_than_B(f3, c, k, key, oracle):
             m_max = divfloor((i * key.n) + B, f3)
+        else:
+            m_min = divceil((i * key.n) + B, f3)
         count += 1
     return m_min
 
@@ -124,7 +132,7 @@ def manger_attack(k, key, c, oracle, verbose=False):
         print("f2 =", f2)
 
     m = find_m(k, key, c, f2, oracle, True)
-    print(f"{m.to_bytes(k, byteorder='big')=}")
+
     # Test the result - if implemented properly the attack should always succeed
     if pow(m, key.e, key.n) == c:
         return m.to_bytes(k, byteorder='big')
@@ -138,7 +146,7 @@ if __name__ == "__main__":
     key = RSA.generate(n_length)
     pub_key = key.public_key()
     k = int(n_length / 8)
- 
+
     oracle = PKCS1_OAEP_Oracle(k, key)
 
     cipher = PKCS1_OAEP.new(key)
