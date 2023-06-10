@@ -6,10 +6,10 @@ from oracles import PKCS1_v1_5_Oracle
 from os import urandom
 from Crypto.PublicKey import RSA
 
-#### Added this
-from Crypto.Cipher import PKCS1_v1_5
-from Crypto.Signature import pkcs1_15
-from Crypto.Hash import SHA256
+#### Added this for custom checks
+# from Crypto.Cipher import PKCS1_v1_5
+# from Crypto.Signature import pkcs1_15
+# from Crypto.Hash import SHA256
 
 
 def egcd(a, b):
@@ -81,14 +81,18 @@ def merge_intervals(intervals):
     merged.append(curr)
     return merged
 
-########## our function
 def compute_c_attempt(s, c, key):
+    """
+    Returns the option for new c based on passed parameters.
+    """
     return (c * pow(s, key.e, key.n)) % key.n
 
 def check_s_passes_query(s, c, k, key, oracle):
+    """
+    Returns if suggested s gives result that passes PKCS oracle query.
+    """
     c_attempt = compute_c_attempt(s, c, key)
     return oracle.query(c_attempt.to_bytes(k, byteorder='big'))
-########## our function
 
 
 def blinding(k, key, c, oracle):
@@ -102,13 +106,10 @@ def blinding(k, key, c, oracle):
     """
     if oracle.query(c.to_bytes(k, byteorder='big')):
         return 1, c
-    indx = 0 # Added index for information
     while True:
-        indx += 1
         s_0 = urandom(k)
         s_0 = int.from_bytes(s_0, byteorder='big') % key.n
         if check_s_passes_query(s_0, c, k, key, oracle):
-            print(f"Finished blinding in {indx=}")
             c_attempt = compute_c_attempt(s_0, c, key)
             return s_0, c_attempt
 
@@ -125,7 +126,6 @@ def find_min_conforming(k, key, c_0, min_s, oracle):
     """
     next_s = min_s
     while True:
-        # s_0 = int.from_bytes(s_0, byteorder='big') % key.n
         if check_s_passes_query(next_s, c_0, k, key, oracle):
             return next_s
         next_s += 1
@@ -148,13 +148,9 @@ def search_single_interval(k, key, B, prev_s, a, b, c_0, oracle):
     next_r = r_lower_bound
     while True:
         s_lower_bound = divceil((2 * B) + (next_r * key.n), b)
-        s_upper_bound = divceil((3 * B) + (next_r * key.n), a) # was floor
-        # print(f"{s_lower_bound=} {s_upper_bound=} {(s_lower_bound < s_upper_bound)=}")
-        if s_lower_bound >= s_upper_bound:
-            print("Lower bound bigger than upper")
+        s_upper_bound = divceil((3 * B) + (next_r * key.n), a)
         for s_option in range(s_lower_bound, s_upper_bound):
             if check_s_passes_query(s_option, c_0, k, key, oracle):
-                print("!!!!!!!!!!!! Passed 2c")
                 return s_option
         next_r += 1
         
@@ -200,8 +196,6 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
     c = int.from_bytes(c, byteorder='big')
     s_0, c_0 = blinding(k, key, c, oracle)
 
-    print(f"{s_0=} {c_0=}")
-
     if verbose:
         print("Blinding complete")
 
@@ -213,21 +207,15 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
             print("Round ", i)
         if i == 1:
             s = find_min_conforming(k, key, c_0, divceil(key.n, 3 * B), oracle)
-            print(f"Got to first find_min returned {s=}")
         elif len(m) > 1:
             s = find_min_conforming(k, key, c_0, s + 1, oracle)
-            print(f"Got to second find_min returned {s=}")
         else:
             a = m[0][0]
             b = m[0][1]
             s = search_single_interval(k, key, B, s, a, b, c_0, oracle)
-            print(f"Got to third find_min returned {s=}")
 
-        print(f"before narrow {len(m)=}")
         m = narrow_m(key, m, s, B)
-        print(f"after narrow {len(m)=}")
 
-        print(f"Intervals: {m}")
         if len(m) == 1 and m[0][0] == m[0][1]:
             result = (m[0][0] * modinv(s_0, key.n)) % key.n
             break
@@ -235,10 +223,8 @@ def bleichenbacher_attack(k, key, c, oracle, verbose=False):
 
     # Test the result
     if pow(result, key.e, key.n) == c:
-        print("Yay")
         return result.to_bytes(k, byteorder='big')
     else:
-        print("Nay")
         return None
 
 
@@ -247,25 +233,24 @@ if __name__ == "__main__":
 
     key = RSA.generate(n_length)
     pub_key = key.public_key()
-    print(f"{pub_key.e=}, {pub_key.n=}")
     k = int(n_length / 8)
 
     oracle = PKCS1_v1_5_Oracle(key)
 
-    # good_m = b'\x00\x02' + 8 * b'\x11' + b'\x00' + (k - 11) * b'\x01'
-    # bad_m = b'\x00\x00' + 8 * b'\x11' + b'\x00' + (k - 11) * b'\x01'
-    # print(len(good_m))
     c = b'\x00' + (k - 1) * bytes([1])
-    cipher = PKCS1_v1_5.new(key)
-    signature = pkcs1_15.new(key)
 
-    good_c = cipher.encrypt(b"hello")
-    bad_c = signature.sign(SHA256.new(b"hello"))
+    ###### custom checks
+    # cipher = PKCS1_v1_5.new(key)
+    # signature = pkcs1_15.new(key)
 
-    result = bleichenbacher_attack(k, pub_key, good_c, oracle, True)
-    print(result)
+    # good_c = cipher.encrypt(b"hello")
+    # bad_c = signature.sign(SHA256.new(b"hello"))
+
+    # result = bleichenbacher_attack(k, pub_key, good_c, oracle, True)
+    # print(result)
     # result = bleichenbacher_attack(k, pub_key, bad_c, oracle, True)
     # print(result)
+    ###### custom checks
     
     result = bleichenbacher_attack(k, pub_key, c, oracle, True)
     print(result)
