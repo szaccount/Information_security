@@ -173,7 +173,7 @@ def narrow_m(key, m_prev, s, B):
         max_r = divfloor((b * s) - (2 * B), key.n)
         for r in range(min_r, max_r + 1):
             start = max(a, divceil((2 * B) + (r * key.n), s))
-            end = min(b, divfloor((3 * b) - 1 + (r * key.n), s))
+            end = min(b, divfloor((3 * B) - 1 + (r * key.n), s))
             ## we added this check
             if start <= end:
             ## we added this check
