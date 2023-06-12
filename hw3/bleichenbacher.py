@@ -1,4 +1,6 @@
 """
+Submit: Sean Zaretzky 209164086, Adi Dinerstein 212081020
+
 Chosen-ciphertext attack on PKCS #1 v1.5
 http://archiv.infsec.ethz.ch/education/fs08/secsem/bleichenbacher98.pdf
 """
