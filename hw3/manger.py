@@ -1,4 +1,6 @@
 """
+Submit: Sean Zaretzky 209164086, Adi Dinerstein 212081020
+
 Chosen-ciphertext attack on PKCS #1 v1.5
 https://www.iacr.org/archive/crypto2001/21390229.pdf
 """
@@ -33,7 +35,6 @@ def divfloor(a, b):
 
 def compute_c_attempt(f, c, key):
     """
-    @adidiner @szaccount function.
     Computes `(c * f ** key.e) mod key.n`.
     """
     return (c * pow(f, key.e, key.n)) % key.n
@@ -41,7 +42,6 @@ def compute_c_attempt(f, c, key):
 
 def check_less_than_B(f, c, k, key, oracle):
     """
-    @adidiner @szaccount function.
     Returns True iff trying `f` with the oracle returns less than B.
     I.e, `f * m` is less than B, `m` is the plaintext corresponding to `c`.
     """
