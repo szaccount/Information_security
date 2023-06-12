@@ -1,4 +1,6 @@
 """
+Submit: Sean Zaretzky 209164086, Adi Dinerstein 212081020
+
 Chosen-ciphertext attack on PKCS #1 v1.5
 https://www.iacr.org/archive/crypto2001/21390229.pdf
 """
@@ -31,6 +33,22 @@ def divfloor(a, b):
     return q
 
 
+def compute_c_attempt(f, c, key):
+    """
+    Computes `(c * f ** key.e) mod key.n`.
+    """
+    return (c * pow(f, key.e, key.n)) % key.n
+
+
+def check_less_than_B(f, c, k, key, oracle):
+    """
+    Returns True iff trying `f` with the oracle returns less than B.
+    I.e, `f * m` is less than B, `m` is the plaintext corresponding to `c`.
+    """
+    c_attempt = compute_c_attempt(f, c, key)
+    return oracle.query(c_attempt.to_bytes(k, byteorder='big'))
+
+
 def find_f1(k, key, c, oracle):
     """
     Step 1 of the attack
@@ -41,7 +59,10 @@ def find_f1(k, key, c, oracle):
     :return: f1 such that B/2 <= f1 * m / 2 < B
     """
     f1 = 2
-    ?
+    while True:
+        if not check_less_than_B(f1, c, k, key, oracle):
+            return f1
+        f1 *= 2
 
 
 def find_f2(k, key, c, f1, oracle):
@@ -55,7 +76,11 @@ def find_f2(k, key, c, f1, oracle):
     :return: f2 such that n <= f2 * m < n + B
     """
     B = 2 ** (8 * (k - 1))
-    ?
+    f2 = divfloor(key.n + B, B) * (f1 // 2)
+    while True:
+        if check_less_than_B(f2, c, k, key, oracle):
+            return f2
+        f2 += f1 // 2
 
 
 def find_m(k, key, c, f2, oracle, verbose=False):
@@ -75,7 +100,14 @@ def find_m(k, key, c, f2, oracle, verbose=False):
     while m_max != m_min:
         if verbose:
             print("Round", count)
-        ?
+        f_tmp = divfloor(2 * B, m_max - m_min)
+        i = divfloor(f_tmp * m_min, key.n)
+        f3 = divceil(i * key.n, m_min)
+        if check_less_than_B(f3, c, k, key, oracle):
+            m_max = divfloor((i * key.n) + B, f3)
+        else:
+            m_min = divceil((i * key.n) + B, f3)
+        count += 1
     return m_min
 
 
