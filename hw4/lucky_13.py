@@ -16,9 +16,9 @@ def cut_blocks(c, nonce, t):
     """
     c_t = c[t * BLOCK_LEN: (t + 1) * BLOCK_LEN]
     if t == 0:
-        c_t_prev = ?
+        c_t_prev = nonce
     else:
-        c_t_prev = ?
+        c_t_prev = c[(t - 1) * BLOCK_LEN: t * BLOCK_LEN]
 
     return c_t_prev, c_t
 
@@ -38,7 +38,14 @@ def lucky_13(c, nonce, t, oracle):
     c_t_prev = int.from_bytes(c_t_prev, byteorder='big')
 
     for two_bytes in range(2 ** 16):
-        ?
+        xored_c_t_prev = (c_t_prev ^ two_bytes).to_bytes(BLOCK_LEN, byteorder='big')
+        # Use c_t as random blocks.
+        r1 = c_t
+        r2 = c_t
+        c_for_oracle = r1 + r2 + xored_c_t_prev + c_t
+        if oracle.query((c_for_oracle, nonce)) == oracle.few_calls:
+            candidates.append((two_bytes ^ 0x0101).to_bytes(2, byteorder='big'))
+
     return candidates
 
 
