@@ -39,11 +39,11 @@ def lucky_13(c, nonce, t, oracle):
 
     for two_bytes in range(2 ** 16):
         xored_c_t_prev = (c_t_prev ^ two_bytes).to_bytes(BLOCK_LEN, byteorder='big')
-        # Use c_t as random blocks.
-        r1 = c_t
-        r2 = c_t
+        # Use c_t as two "random" blocks.
+        r1, r2 = c_t, c_t
         c_for_oracle = r1 + r2 + xored_c_t_prev + c_t
         if oracle.query((c_for_oracle, nonce)) == oracle.few_calls:
+            # "few call" means that with high probabily, we got 0x0101 padding.
             candidates.append((two_bytes ^ 0x0101).to_bytes(2, byteorder='big'))
 
     return candidates
