@@ -26,11 +26,18 @@ class ModifiedPRF(object):
         rang = self.f.rang
 
         if domain < rang:
-            ?
+            return self.f.calc(x) & (domain - 1)
         elif domain > rang:
-            ?
+            len_domain = self.f.domain_bytes * 8
+            len_rang = self.f.rang_bytes * 8
+            num_flavours = len_domain / len_rang
+            rv = 0
+            for i in range(num_flavours):
+                rv <<= len_rang
+                rv += self.f.calc((x + i) % domain)
+            return rv
         else:
-            ?
+            return self.f.calc(x)
 
     def recover_x(self, x):
         """
