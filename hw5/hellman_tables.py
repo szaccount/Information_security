@@ -66,10 +66,15 @@ def hellman_preprocess(m, t, f_tag):
     """
     tables = []
     for i in range(t):
+        f_tag_i = lambda x: f_tag.calc((x+i) % f_tag.f.domain)
         table = defaultdict(list)
-
-        ?
-
+        for i in range(m):
+            start_point = int.from_bytes(urandom(f_tag.f.domain_bytes), byteorder='big')
+            point = start_point
+            for _ in range(t):
+                point = f_tag_i(point)
+            table[point] = start_point
+    
         tables.append(table)
         print(i)
     return tables
@@ -84,7 +89,17 @@ def hellman_online(tables, t, y, f_tag):
     :param f_tag: modified oracle for a random function
     :return: x such that f(x)=y if the attack succeeded, else None
     """
-    ?
+    points = [y for _ in range(t)] # t as number of tables
+    for _ in range(t): # t as max number of steps
+        for i in range(t): # t as number of tables
+            f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.domain)
+            points[i] = f_tag_i(points[i])
+            points_i = points[i]
+            if points_i in tables[i].keys():
+                ptr = tables[i][points_i]
+                while :
+                    
+
 
 
 def run_hellman(f, m, t):
