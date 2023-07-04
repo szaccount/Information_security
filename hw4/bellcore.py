@@ -62,7 +62,7 @@ class RSA_oracle(RSA_CRT):
         """
         m_p = self._dec_mod_p(c)
         m_q = self._dec_mod_q(c)
-        M = m_p * self._q * self._q_inv + m_q * self._p * self._p_inv # !!! maybe need to do mod n, in lecture don't do
+        M = m_p * self._q * self._q_inv + m_q * self._p * self._p_inv
         return M
 
     def faulty_dec(self, c):
@@ -73,7 +73,7 @@ class RSA_oracle(RSA_CRT):
         """
         m_p = self._faulty_dec_mod_p(c)
         m_q = self._dec_mod_q(c)
-        M_tag = m_p * self._q * self._q_inv + m_q * self._p * self._p_inv # !!! maybe need to do mod n, in lecture don't do
+        M_tag = m_p * self._q * self._q_inv + m_q * self._p * self._p_inv
         return M_tag
 
 
@@ -83,7 +83,7 @@ def bellcore_attack(rsa):
     :param rsa: RSA decryption oracle that may calculate c ^ d mod p incorrectly.
     :return: p, q, where p * q = n
     """ 
-    c = 10 # maybe choose at random / build from m !!!!!!!!!!!!
+    c = (rsa.n - 2) % rsa.n
     M = rsa.dec(c)
     M_tag = rsa.faulty_dec(c)
 
