@@ -15,6 +15,7 @@ class ModifiedPRF(object):
         """
         self.f = f
 
+    # !!!!!!!!!!!!!!!!!! said maybe need to adjust input rather than output
     def calc(self, x):
         """
         Calculate a modified f
@@ -97,7 +98,7 @@ def hellman_online(tables, t, y, f_tag):
             points_i = points[i]
             if points_i in tables[i].keys():
                 ptr = tables[i][points_i]
-                while :
+                while : # !!!!!!!!!!!! tha problem we have here is that y not necessarily in chain if dimain != range
                     
 
 
