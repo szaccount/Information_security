@@ -25,9 +25,13 @@ class ModifiedPRF(object):
         """
         domain = self.f.domain
         rang = self.f.rang
-
+        
+        """
+        The function adjusts to the larger output if needed.
+        """
         if domain < rang:
             return self.f.calc(x) & (domain - 1)
+            # return self.f.calc(x & (domain - 1))
         elif domain > rang:
             len_domain = self.f.domain_bytes * 8
             len_rang = self.f.rang_bytes * 8
@@ -49,12 +53,13 @@ class ModifiedPRF(object):
         domain = self.f.domain
         rang = self.f.rang
 
-        if domain < rang:
-            ?
-        elif domain > rang:
-            ?
-        else:
-            ?
+        return x
+        # if domain < rang:
+        #     ?
+        # elif domain > rang:
+        #     ?
+        # else:
+        #     ?
 
 
 def hellman_preprocess(m, t, f_tag):
@@ -69,7 +74,7 @@ def hellman_preprocess(m, t, f_tag):
     for i in range(t):
         f_tag_i = lambda x: f_tag.calc((x+i) % f_tag.f.domain)
         table = defaultdict(list)
-        for i in range(m):
+        for _ in range(m):
             start_point = int.from_bytes(urandom(f_tag.f.domain_bytes), byteorder='big')
             point = start_point
             for _ in range(t):
@@ -90,18 +95,33 @@ def hellman_online(tables, t, y, f_tag):
     :param f_tag: modified oracle for a random function
     :return: x such that f(x)=y if the attack succeeded, else None
     """
-    points = [y for _ in range(t)] # t as number of tables
+    domain = f_tag.f.domain
+    rang = f_tag.f.rang
+    
+    y_tag = y
+
+    if domain < rang:
+        y_tag = y & (domain - 1)
+    elif domain > rang:
+        diff_num_bytes = f_tag.f.domain_bytes - f_tag.f.rang_bytes
+        rand_suffix = int.from_bytes(urandom(diff_num_bytes), byteorder='big')
+        y_tag << (diff_num_bytes * 8)
+        y_tag += rand_suffix
+
+    points = [y_tag for _ in range(t)] # t as number of tables
+
     for _ in range(t): # t as max number of steps
         for i in range(t): # t as number of tables
             f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.domain)
             points[i] = f_tag_i(points[i])
             points_i = points[i]
             if points_i in tables[i].keys():
-                ptr = tables[i][points_i]
-                while : # !!!!!!!!!!!! tha problem we have here is that y not necessarily in chain if dimain != range
-                    
-
-
+                ptr = tables[i][points_i] # init to start point
+                # !!!!!!!!!!!! tha problem we have here is that y not necessarily in chain if dimain != range
+                while f_tag_i(ptr) != y_tag: # TODO maybe need to verify against f_i and not f_tag_i
+                    ptr = f_tag_i(ptr)
+                return (ptr + i) % f_tag.f.domain # flavour correction
+    return None
 
 def run_hellman(f, m, t):
     """
@@ -142,8 +162,8 @@ def test_2():
     key = b'8{8H\x00\xe5\xa6\xc7BTs=\xba\xd5\x18\xe6'
     domain_size = 2
     rang_size = 3
-    m = ?
-    t = ?
+    # m = ?
+    # t = ?
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
@@ -154,8 +174,8 @@ def test_3():
     key = b'\xa42A\xcf\x0c\xf4\x001\xff\xd7\xaa\x8f\tZ\x11\xdd'
     domain_size = 3
     rang_size = 2
-    m = ?
-    t = ?
+    # m = ?
+    # t = ?
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
@@ -163,8 +183,8 @@ def test_3():
 
 def main():
     print("Test 1 success rate:", test_1())
-    print("Test 2 success rate:", test_2())
-    print("Test 3 success rate:", test_3())
+    # print("Test 2 success rate:", test_2())
+    # print("Test 3 success rate:", test_3())
 
 
 if __name__ == "__main__":
