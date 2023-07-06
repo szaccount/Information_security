@@ -71,11 +71,15 @@ def hellman_preprocess(m, t, f_tag):
     :return: a list of tables, where each table is a dictionary from the end points to the start points
     """
     tables = []
+    print("In hellman_preprocess")
     for i in range(t):
+        print(f"flavour {i=}")
         f_tag_i = lambda x: f_tag.calc((x+i) % f_tag.f.domain)
         table = defaultdict(list)
-        for _ in range(m):
-            start_point = int.from_bytes(urandom(f_tag.f.domain_bytes), byteorder='big')
+        for j in range(m):
+            # print(f"Wroking on chain {j=}")
+            # start_point = int.from_bytes(urandom(f_tag.f.domain_bytes), byteorder='big')
+            start_point = j % f_tag.f.domain
             point = start_point
             for _ in range(t):
                 point = f_tag_i(point)
@@ -100,6 +104,7 @@ def hellman_online(tables, t, y, f_tag):
     
     y_tag = y
 
+    print(f"In hellman_online {domain=} {rang=} {t=} {y=}")
     if domain < rang:
         y_tag = y & (domain - 1)
     elif domain > rang:
@@ -108,19 +113,30 @@ def hellman_online(tables, t, y, f_tag):
         y_tag << (diff_num_bytes * 8)
         y_tag += rand_suffix
 
+    print(f"{y_tag}")
+
     points = [y_tag for _ in range(t)] # t as number of tables
 
-    for _ in range(t): # t as max number of steps
+    for step in range(t): # t as max number of steps
+        print(f"In {step=}")
         for i in range(t): # t as number of tables
+            print(f"Working on table {i=}")
             f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.domain)
             points[i] = f_tag_i(points[i])
             points_i = points[i]
-            if points_i in tables[i].keys():
+            if points_i in tables[i].keys(): # TODO can also do if _ in tables[i], might be faster
+                print(f"{points_i} is endpoint")
                 ptr = tables[i][points_i] # init to start point
                 # !!!!!!!!!!!! tha problem we have here is that y not necessarily in chain if dimain != range
-                while f_tag_i(ptr) != y_tag: # TODO maybe need to verify against f_i and not f_tag_i
+                # also it might not be in chain if more than one chain leads to endpoint but we have one start
+                counter = 0
+                while counter <= t and f_tag_i(ptr) != y_tag: # TODO maybe need to verify against f_i and not f_tag_i also might be infinite
+                    # print(f"interation {counter} of searching for origin")
+                    counter += 1
                     ptr = f_tag_i(ptr)
+                print(f"Found origin")
                 return (ptr + i) % f_tag.f.domain # flavour correction
+    print("Didn't find origin")
     return None
 
 def run_hellman(f, m, t):
@@ -133,15 +149,23 @@ def run_hellman(f, m, t):
     """
     f_tag = ModifiedPRF(f)
 
+    print("In run_hellman !!!!!!!!!!!!!!!!")
+    print(f" before preprocess: {m=} {t=}")
     tables = hellman_preprocess(m, t, f_tag)
+    print(f" after preprocess")
 
     success_count = 0
     for i in range(100):
+        print("New y trial")
         y = f.calc(int.from_bytes(urandom(f.domain_bytes), byteorder='big'))
+        print(f"before hellman_online {y=}")
         x = hellman_online(tables, t, y, f_tag)
+        print(f"after hellman_online {x=}")
         if x is not None:
             x = f_tag.recover_x(x)
+            print(f"after recover_x, {x=}")
             if f.calc(x) == y:
+                print("success, f.calc(x)==y")
                 success_count += 1
     return success_count
 
@@ -164,6 +188,8 @@ def test_2():
     rang_size = 3
     # m = ?
     # t = ?
+    m = 2 ** 8
+    t = 2 ** 8
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
@@ -176,15 +202,17 @@ def test_3():
     rang_size = 2
     # m = ?
     # t = ?
+    m = 2 ** 8
+    t = 2 ** 8
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
 
 
 def main():
-    print("Test 1 success rate:", test_1())
+    # print("Test 1 success rate:", test_1())
     # print("Test 2 success rate:", test_2())
-    # print("Test 3 success rate:", test_3())
+    print("Test 3 success rate:", test_3())
 
 
 if __name__ == "__main__":
