@@ -46,6 +46,7 @@ class ModifiedPRF(object):
         
         # Assume x is the size of rang.
         if domain < rang:
+            # print(f"Got {x=}, {(domain - 1)=}, {(x & (domain - 1))=}")
             return self.f.calc(x & (domain - 1))
         elif domain > rang:
             len_domain = self.f.domain_bytes * 8
@@ -124,6 +125,8 @@ def hellman_preprocess(m, t, f_tag):
             point = start_point
             for _ in range(t):
                 point = f_tag_i(point)
+            # if point in table:
+                # print(f"Got collision in endpoint {point}, tried putting {start_point=} but has {table[point]=}")
             table[point] = start_point
     
         tables.append(table)
@@ -223,6 +226,7 @@ def run_hellman(f, m, t):
     print(f" after preprocess")
 
     success_count = 0
+    counter_maybe_success = 0
     for i in range(100):
         print("New y trial")
         y = f.calc(int.from_bytes(urandom(f.domain_bytes), byteorder='big'))
@@ -230,11 +234,13 @@ def run_hellman(f, m, t):
         x = hellman_online(tables, t, y, f_tag)
         print(f"after hellman_online {x=}")
         if x is not None:
+            counter_maybe_success += 1
             x = f_tag.recover_x(x)
             print(f"after recover_x, {x=}")
             if f.calc(x) == y:
                 print("success, f.calc(x)==y")
                 success_count += 1
+    print(f"{success_count=} {counter_maybe_success=}")
     return success_count
 
 
@@ -242,8 +248,10 @@ def test_1():
     # The case where domain = range
     key = b'j\xb1\xd5\xfa\x92\x11X\x12\x00\xde3\xae\x16L8['
     block_size = 3
-    m = 2 ** 8
-    t = 2 ** 8
+    # m = 2 ** 8
+    # t = 2 ** 8
+    m = 2 ** 14
+    t = 2 ** 5
 
     f = PRF(key, block_size)
     return run_hellman(f, m, t)
@@ -256,8 +264,10 @@ def test_2():
     rang_size = 3
     # m = ?
     # t = ?
+    # m = 2 ** 8
+    # t = 2 ** 8
     m = 2 ** 8
-    t = 2 ** 8
+    t = 2 ** 4
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
@@ -278,8 +288,8 @@ def test_3():
 
 
 def main():
-    print("Test 1 success rate:", test_1())
-    # print("Test 2 success rate:", test_2())
+    # print("Test 1 success rate:", test_1())
+    print("Test 2 success rate:", test_2())
     # print("Test 3 success rate:", test_3())
 
 
