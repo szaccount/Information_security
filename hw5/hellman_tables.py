@@ -24,13 +24,22 @@ class ModifiedPRF(object):
         """
         domain = self.f.domain
         rang = self.f.rang
-
+        
+        # Assume x is the size of rang, correct it to the size of the domain
+        # and output y in the size of the range.
         if domain < rang:
-            ?
+            return self.f.calc(x & (domain - 1))
         elif domain > rang:
-            ?
+            len_domain = self.f.domain_bytes * 8
+            len_rang = self.f.rang_bytes * 8
+            num_parts = len_domain // len_rang + (len_domain % len_rang > 0)
+            rv = x
+            for i in range(num_parts - 1):
+                rv <<= len_rang
+                rv += self.f.calc((x + i) % domain)
+            return self.f.calc(rv & (domain - 1))
         else:
-            ?
+            return self.f.calc(x)
 
     def recover_x(self, x):
         """
@@ -41,12 +50,21 @@ class ModifiedPRF(object):
         domain = self.f.domain
         rang = self.f.rang
 
+        # Assume x is the size of rang, correct it to the size of the domain
+        # in the same manner as `calc`.
         if domain < rang:
-            ?
+            return x & (domain - 1)
         elif domain > rang:
-            ?
+            len_domain = self.f.domain_bytes * 8
+            len_rang = self.f.rang_bytes * 8
+            num_parts = len_domain // len_rang + (len_domain % len_rang > 0)
+            rv = x
+            for i in range(num_parts - 1):
+                rv <<= len_rang
+                rv += self.f.calc((x + i) % domain)
+            return rv & (domain - 1)
         else:
-            ?
+            return x
 
 
 def hellman_preprocess(m, t, f_tag):
@@ -59,10 +77,15 @@ def hellman_preprocess(m, t, f_tag):
     """
     tables = []
     for i in range(t):
+        f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.rang)
         table = defaultdict(list)
-
-        ?
-
+        for j in range(m):
+            start_point = j % f_tag.f.rang
+            point = start_point
+            for _ in range(t):
+                point = f_tag_i(point)
+            table[point].append(start_point)
+    
         tables.append(table)
         print(i)
     return tables
@@ -77,8 +100,30 @@ def hellman_online(tables, t, y, f_tag):
     :param f_tag: modified oracle for a random function
     :return: x such that f(x)=y if the attack succeeded, else None
     """
-    ?
+    domain = f_tag.f.domain
+    rang = f_tag.f.rang
+    
+    # We perform the online stage on all tables in parallel.
+    # Initilize the current point for each table.
+    point_per_table = [y for _ in range(t)]
 
+    for step in range(t): # The length of chains it t.
+        for i in range(t):
+            table = tables[i]
+            f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.rang)
+            current_point = f_tag_i(point_per_table[i])
+            point_per_table[i] = current_point
+            if current_point in table:
+                for start_point in table[current_point]:
+                    ptr = start_point
+                    # Search origin for y from start point.
+                    # The chain length is t, thus we search for at most t steps.
+                    for _ in range(t):
+                        if f_tag_i(ptr) == y:
+                            # Flavour correction, from f_tag_i to f_tag.
+                            return (ptr + i) % f_tag.f.rang
+                        ptr = f_tag_i(ptr)
+    return None
 
 def run_hellman(f, m, t):
     """
@@ -119,8 +164,8 @@ def test_2():
     key = b'8{8H\x00\xe5\xa6\xc7BTs=\xba\xd5\x18\xe6'
     domain_size = 2
     rang_size = 3
-    m = ?
-    t = ?
+    m = 2 ** 8
+    t = 2 ** 4
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
@@ -131,8 +176,8 @@ def test_3():
     key = b'\xa42A\xcf\x0c\xf4\x001\xff\xd7\xaa\x8f\tZ\x11\xdd'
     domain_size = 3
     rang_size = 2
-    m = ?
-    t = ?
+    m = 2 ** 16
+    t = 2 ** 4
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
