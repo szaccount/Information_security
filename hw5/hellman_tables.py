@@ -25,7 +25,8 @@ class ModifiedPRF(object):
         domain = self.f.domain
         rang = self.f.rang
         
-        # Assume x is the size of rang.
+        # Assume x is the size of rang, correct it to the size of the domain
+        # and output y in the size of the range.
         if domain < rang:
             return self.f.calc(x & (domain - 1))
         elif domain > rang:
@@ -49,6 +50,8 @@ class ModifiedPRF(object):
         domain = self.f.domain
         rang = self.f.rang
 
+        # Assume x is the size of rang, correct it to the size of the domain
+        # in the same manner as `calc`.
         if domain < rang:
             return x & (domain - 1)
         elif domain > rang:
@@ -100,15 +103,16 @@ def hellman_online(tables, t, y, f_tag):
     domain = f_tag.f.domain
     rang = f_tag.f.rang
     
+    # We perform the online stage on all tables in parallel.
     # Initilize the current point for each table.
-    points_per_table = [y for _ in range(t)]
+    point_per_table = [y for _ in range(t)]
 
     for step in range(t): # The maximal length of chains is t.
         for i in range(t):
             table = tables[i]
             f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.rang)
-            current_point = f_tag_i(points_per_table[i])
-            points_per_table[i] = current_point
+            current_point = f_tag_i(point_per_table[i])
+            point_per_table[i] = current_point
             if current_point in table:
                 for start_point in table[current_point]:
                     ptr = start_point
