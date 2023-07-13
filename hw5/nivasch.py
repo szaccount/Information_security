@@ -6,23 +6,36 @@ from prf import PRF
 
 
 class MonotonicStack:
+    """
+    A stack which is guaranteed to be non-decreasing monotonic
+    (i.e, the top of the stack is the biggest value).
+    Pushing a value to the stack pops all the bigger values.
+    """
     def __init__(self):
-        self.stack = []
+        self._stack = []
 
     def top(self):
-        if len(self.stack) == 0:
+        """
+        Returns the top of the stack, None if the stack is empty.
+        """
+        if len(self._stack) == 0:
             return None
-        return self.stack[-1]
+        return self._stack[-1]
 
     def push(self, a):
-        if len(self.stack) == 0:
-            self.stack.append(a)
+        """
+        Push a new value `a`, and pop all the values bigger than `a`.
+        Returns the biggest value after `a` (i.e, the value a is pushed on top,
+        this is None if `a` is the only value in the stack).
+        """
+        if len(self._stack) == 0:
+            self._stack.append(a)
             return None
 
-        while self.stack and self.stack[-1] > a:
-            self.stack.pop()
+        while self._stack and self._stack[-1] > a:
+            self._stack.pop()
         top_before_a = self.top()
-        self.stack.append(a)
+        self._stack.append(a)
         return top_before_a
 
 
