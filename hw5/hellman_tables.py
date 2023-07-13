@@ -107,7 +107,7 @@ def hellman_online(tables, t, y, f_tag):
     # Initilize the current point for each table.
     point_per_table = [y for _ in range(t)]
 
-    for step in range(t): # The maximal length of chains is t.
+    for step in range(t): # The length of chains it t.
         for i in range(t):
             table = tables[i]
             f_tag_i = lambda x: f_tag.calc((x + i) % f_tag.f.rang)
@@ -116,6 +116,8 @@ def hellman_online(tables, t, y, f_tag):
             if current_point in table:
                 for start_point in table[current_point]:
                     ptr = start_point
+                    # Search origin for y from start point.
+                    # The chain length is t, thus we search for at most t steps.
                     for _ in range(t):
                         if f_tag_i(ptr) == y:
                             # Flavour correction, from f_tag_i to f_tag.
