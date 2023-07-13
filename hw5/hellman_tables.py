@@ -164,8 +164,8 @@ def test_2():
     key = b'8{8H\x00\xe5\xa6\xc7BTs=\xba\xd5\x18\xe6'
     domain_size = 2
     rang_size = 3
-    m = 2 ** 12
-    t = 2 ** 2
+    m = 2 ** 8
+    t = 2 ** 4
 
     f = PRF(key, domain_size, rang_size)
     return run_hellman(f, m, t)
